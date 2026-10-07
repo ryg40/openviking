@@ -1,0 +1,54 @@
+# Inactive GitHub Actions mockup. Read build.workflow.md.
+# GitHub does not load workflows from examples/.
+name: Example OpenViking image build
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Configure required reviewers and branch restrictions before activation.
+    environment: openviking-build
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Stop until enterprise integrations pass review
+        run: |
+          echo 'Inactive example. Replace this gate only after the documented review.'
+          exit 1
+      # Replace every action ref with a reviewed full commit SHA.
+      - uses: actions/checkout@REPLACE_WITH_REVIEWED_COMMIT_SHA
+        with:
+          persist-credentials: false
+      - name: Exchange GitHub OIDC identity for a scoped AWS role
+        uses: aws-actions/configure-aws-credentials@REPLACE_WITH_REVIEWED_COMMIT_SHA
+        with:
+          role-to-assume: ${{ vars.AWS_BUILD_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: openviking-image-build
+      - name: Build and scan before publishing
+        env:
+          # This integration does not exist in this example.
+          # It must build with locked dependencies and approved base digests.
+          REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+        run: |
+          test -x ./enterprise/build-scan-publish
+          ./enterprise/build-scan-publish --repository "$REPOSITORY" --output release.json
+      - name: Validate the immutable release record
+        run: |
+          python3 - <<'PY'
+          import json, re
+          release = json.load(open('release.json'))
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', release['digest'])
+          assert release['scan_passed'] is True
+          assert release['provenance_verified'] is True
+          PY
+      - name: Retain the approved release record
+        uses: actions/upload-artifact@REPLACE_WITH_REVIEWED_COMMIT_SHA
+        with:
+          name: openviking-release
+          path: release.json
+          retention-days: 14
+# Never provide deployment authority or runtime secret reads to this build role.

@@ -1,0 +1,75 @@
+# Inactive EC2 example. Read compose.ec2.md before use.
+# Keep this file separate from the live root Compose file.
+name: openviking-example
+services:
+  openviking:
+    # Supply a reviewed repository@sha256 digest, not a mutable tag.
+    image: ${OPENVIKING_IMAGE:?Supply a tested immutable image digest}
+    # Test this UID against the selected image before production use.
+    user: "10001:10001"
+    restart: unless-stopped
+    command: ["--with-bot"]
+    # The host prepares this protected file from approved secret storage.
+    env_file: ["/run/openviking/app.env"]
+    environment:
+      HOME: /app
+      OPENVIKING_PUBLIC_BASE_URL: https://ov-browser.example.invalid
+      OPENVIKING_SERVER_HOST: 0.0.0.0
+      OPENVIKING_SERVER_PORT: "1933"
+      OPENVIKING_CONFIG_FILE: /app/.openviking/ov.conf
+    # Put this directory on its own encrypted EBS filesystem.
+    # ov.conf must retain api_key mode and the required root key.
+    volumes: ["/srv/openviking/state:/app/.openviking"]
+    # No host port and no shared ingress network reach the raw app.
+    networks: [backend]
+    cpus: "2.0"
+    mem_limit: 4g
+    pids_limit: 512
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "openviking-entrypoint", "--healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  oauth2-proxy:
+    # Pin a reviewed oauth2-proxy release by digest.
+    image: ${OAUTH2_PROXY_IMAGE:?Supply a tested immutable image digest}
+    user: "65532:65532"
+    command: ["--config=/etc/oauth2-proxy.cfg"]
+    # Use OAUTH2_PROXY_CLIENT_SECRET and OAUTH2_PROXY_COOKIE_SECRET here.
+    env_file: ["/run/openviking/oauth.env"]
+    volumes: ["./oauth2-proxy.cfg:/etc/oauth2-proxy.cfg:ro"]
+    networks: [backend]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    mem_limit: 256m
+    cpus: "0.25"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  gateway:
+    # Use a reviewed nginx-unprivileged image with auth_request support.
+    image: ${NGINX_IMAGE:?Supply a tested immutable image digest}
+    user: "101:101"
+    volumes: ["./nginx.conf:/etc/nginx/nginx.conf:ro"]
+    networks: [backend, ingress]
+    # Only shared ingress can reach port 8080. Do not publish it publicly.
+    expose: ["8080"]
+    read_only: true
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    mem_limit: 128m
+    cpus: "0.25"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+networks:
+  # This isolated membership list does not block outbound model requests.
+  # Enforce outbound policy through the host and shared network controls.
+  backend: {}
+  # Create this network only through the approved shared ingress setup.
+  ingress:
+    external: true
+    name: approved-ingress

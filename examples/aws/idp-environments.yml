@@ -1,0 +1,27 @@
+# ILLUSTRATIVE ONLY. Ask the identity team for the real schema.
+schema_status: illustrative-not-a-service-contract
+# Separate registrations prevent a staging callback from entering production.
+environments:
+  staging:
+    tenant_id: REPLACE_TENANT_ID
+    client_id: REPLACE_STAGING_CLIENT_ID
+    app_url: https://ov-browser-staging.example.invalid
+    callbacks: [https://ov-browser-staging.example.invalid/oauth2/callback]
+    assignment_required: true
+    assigned_group_object_ids: [REPLACE_STAGING_GROUP_ID]
+    client_secret_reference: REPLACE_STAGING_SECRET_ARN
+    cookie_secret_reference: REPLACE_STAGING_COOKIE_SECRET_ARN
+  production:
+    tenant_id: REPLACE_TENANT_ID
+    client_id: REPLACE_PRODUCTION_CLIENT_ID
+    app_url: https://ov-browser.example.invalid
+    callbacks: [https://ov-browser.example.invalid/oauth2/callback]
+    assignment_required: true
+    assigned_group_object_ids: [REPLACE_PRODUCTION_GROUP_ID]
+    client_secret_reference: REPLACE_PRODUCTION_SECRET_ARN
+    cookie_secret_reference: REPLACE_PRODUCTION_COOKIE_SECRET_ARN
+# Secret references are identifiers, not credential values.
+# LDAP anchors must resolve to these Entra groups through approved mapping.
+provisioning:
+  endpoint: UNKNOWN_DO_NOT_GUESS
+  graph_credentials_in_application: false

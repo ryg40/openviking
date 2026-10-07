@@ -1,0 +1,58 @@
+# Optional new-host example. Prefer measured existing EC2 capacity.
+# Read host.cfn.md. This template does not install or start an application.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Optional private EC2 host using existing network and IAM resources
+Parameters:
+  ImageId:
+    Type: AWS::EC2::Image::Id
+    Description: Supply an approved patched x86_64 Linux image with SSM Agent.
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    Description: Trial size only. Check CPU credits and application capacity.
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Use an approved subnet with shared controlled egress.
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Use a group that allows only approved ingress and egress.
+  InstanceProfile:
+    Type: String
+    Description: Existing least-privilege SSM, image-pull, and runtime-secret profile.
+  KmsKeyArn:
+    Type: String
+    AllowedPattern: 'arn:[a-z-]+:kms:[a-z0-9-]+:[0-9]{12}:key/.+'
+    Description: Existing encryption key with approved grants.
+Resources:
+  Host:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      # No public address and no SSH key. Use approved SSM access.
+      NetworkInterfaces:
+        - DeviceIndex: '0'
+          AssociatePublicIpAddress: false
+          SubnetId: !Ref SubnetId
+          GroupSet: [!Ref SecurityGroupId]
+      # Require token-based instance metadata. Block container access separately.
+      MetadataOptions:
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            Encrypted: true
+            KmsKeyId: !Ref KmsKeyArn
+            VolumeType: gp3
+            VolumeSize: 20
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: openviking-optional-host
+      # No UserData means no secret values or application commands enter CFN.
+Outputs:
+  InstanceId:
+    Description: Use this ID with the separate storage template after review.
+    Value: !Ref Host

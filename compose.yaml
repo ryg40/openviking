@@ -1,0 +1,36 @@
+# OpenViking server with VikingBot. Host-specific values live outside Git.
+# Copy .env.example to .env and set OPENVIKING_ROOT_API_KEY before you start.
+# See docs/host-configuration.md for the host override and the live-data warning.
+name: openviking
+
+services:
+  openviking:
+    image: ${OPENVIKING_IMAGE:-openviking:local}
+    # No build section: Compose cannot compute the version and the labels.
+    # Build with `sh scripts/build.sh gateway`. Never pull: a missing image
+    # is an error. Pull a digest reference with `docker pull` first.
+    # See docs/operations.md.
+    pull_policy: never
+    restart: unless-stopped
+    # Keep VikingBot in the combined service.
+    command: ["--with-bot"]
+    # This runtime file is ignored by Git. Never commit its values.
+    env_file: .env
+    environment:
+      OPENVIKING_ROOT_API_KEY: ${OPENVIKING_ROOT_API_KEY:?is empty; see .env.example}
+      OPENVIKING_PUBLIC_BASE_URL: ${OPENVIKING_PUBLIC_BASE_URL:-http://127.0.0.1:1933}
+      OPENVIKING_SERVER_HOST: 0.0.0.0
+      OPENVIKING_SERVER_PORT: "1933"
+    # Bind to loopback by default, not to every host interface.
+    ports:
+      - "${OPENVIKING_BIND:-127.0.0.1}:${OPENVIKING_PORT:-1933}:1933"
+    # Configuration and local storage together. This is not a backup.
+    volumes:
+      - ./data:/app/.openviking
+    # A health check does not prove authenticated access or restore readiness.
+    healthcheck:
+      test: ["CMD", "openviking-entrypoint", "--healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s

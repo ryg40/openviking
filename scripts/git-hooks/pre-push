@@ -1,0 +1,104 @@
+#!/bin/sh
+# pre-push: scan the commits that the push sends with scripts/scan.sh.
+# Install with scripts/install-hooks.sh. See docs/secret-handling.md.
+#
+# Guard, before the scan: a push to a remote other than origin and upstream
+# (the remote shared, any other remote, a URL on the command line) may send
+# or delete only the branch portable and the tags portable-v*. Each other ref
+# refuses the push. See docs/remotes.md.
+#
+# A secret or a policy finding refuses the push. A host value refuses a push to the branch
+# portable or to a tag portable-v*; for other refs it prints a warning.
+# The commits of the upstream base (scripts/upstream-base) are not scanned,
+# except for the branch portable and a tag portable-v*: these are scanned in
+# all of their history.
+
+set -eu
+
+remote=$1
+# Git writes one line for each ref: <local ref> <local sha> <remote ref> <remote sha>
+refs=$(cat)
+
+case $remote in
+    origin | upstream) ;;
+    *)
+        # The remote name can be a URL; print it without credentials (see
+        # scripts/setup-remotes.sh), or hide it.
+        shown=$(printf '%s\n' "$remote" | sed 's#://[^/]*@#://#g')
+        case $shown in *://*@*) shown='<url hidden>' ;; esac
+        refused=0
+        while read -r local_ref local_sha remote_ref remote_sha; do
+            case $remote_ref in
+                '' | refs/heads/portable | refs/tags/portable-v*) continue ;;
+            esac
+            case $local_sha in *[!0]*) what=push ;; *) what=delete ;; esac
+            echo "pre-push: refused: $what of $remote_ref to '$shown'; this remote takes only refs/heads/portable and refs/tags/portable-v*" >&2
+            refused=1
+        done <<EOF
+$refs
+EOF
+        if [ "$refused" -ne 0 ]; then
+            echo "pre-push: push refused; local-dev, topic/*, sync/* and upstream tags hold host values (docs/remotes.md)" >&2
+            exit 1
+        fi
+        ;;
+esac
+
+top=$(git rev-parse --show-toplevel)
+scan=$top/scripts/scan.sh
+if [ ! -f "$scan" ]; then
+    # Fail closed: the script is gone from the working tree, but the branch has it.
+    if git cat-file -e :scripts/scan.sh 2>/dev/null || git cat-file -e HEAD:scripts/scan.sh 2>/dev/null; then
+        echo "pre-push: scripts/scan.sh is not in the working tree, but it is in the index or in HEAD; push refused" >&2
+        exit 1
+    fi
+    echo "pre-push: scripts/scan.sh is not on this branch (not in the working tree, the index or HEAD); no scan" >&2
+    exit 0
+fi
+
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case $local_sha in *[!0]*) ;; *) continue ;; esac # a delete sends no commit
+    # The upstream base: the commits of the upstream tag in scripts/upstream-base
+    # are not scanned, except for a portable ref.
+    case $remote_ref in
+        refs/heads/portable|refs/tags/portable-v*) exclude=0 ;;
+        *) exclude=1 ;;
+    esac
+    if case $remote_sha in *[!0]*) false ;; *) true ;; esac ||
+        ! git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+        case $remote_ref in
+            # A new portable ref must be clean in all of its history.
+            refs/heads/portable|refs/tags/portable-v*) range=$local_sha ;;
+            # A new ref, or the remote commit is not here: the commits that no
+            # remote-tracking ref of this remote contains.
+            *) range="$local_sha --not --remotes=$remote" ;;
+        esac
+    else
+        range="$remote_sha..$local_sha"
+    fi
+    echo "pre-push: scan $local_ref -> $remote_ref" >&2
+    if SCAN_REF=$remote_ref SCAN_EXCLUDE_UPSTREAM=$exclude sh "$scan" history "$range" </dev/null; then
+        case $remote_ref in
+            refs/heads/portable|refs/tags/portable-v*)
+                public_check=$top/scripts/public-check.sh
+                # Old branches without this command retain the scan-only hook.
+                # Once installed, a missing command fails closed.
+                if [ -f "$public_check" ] ||
+                    git cat-file -e :scripts/public-check.sh 2>/dev/null ||
+                    git cat-file -e HEAD:scripts/public-check.sh 2>/dev/null ||
+                    git cat-file -e "$local_sha:scripts/public-check.sh" 2>/dev/null; then
+                    echo "pre-push: public check $local_ref -> $remote_ref" >&2
+                    sh "$public_check" --ref "$local_sha" </dev/null || status=1
+                fi
+                ;;
+        esac
+    else
+        status=1
+    fi
+done <<EOF
+$refs
+EOF
+
+[ "$status" -eq 0 ] || echo "pre-push: push refused (docs/secret-handling.md)" >&2
+exit "$status"

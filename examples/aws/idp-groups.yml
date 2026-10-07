@@ -1,0 +1,23 @@
+# ILLUSTRATIVE ONLY. No internal schema compatibility is claimed.
+schema_status: illustrative-not-a-service-contract
+application:
+  logical_name: openviking-browser-production
+  tenant_id: REPLACE_TENANT_ID
+  client_id: REPLACE_PRODUCTION_CLIENT_ID
+  app_url: https://ov-browser.example.invalid
+  callbacks: [https://ov-browser.example.invalid/oauth2/callback]
+  assignment_required: true
+identity_mapping:
+  # The identity team resolves this directory group to an Entra object ID.
+  source: ldap
+  target: entra_object_id
+groups:
+  - ldap_dn: cn=example-ov-readers,ou=groups,dc=example,dc=invalid
+    entra_object_id: REPLACE_GROUP_OBJECT_ID
+    permissions: [browser-login]
+    # Verify actual licensing and membership semantics before assignment.
+    nested_group_expansion: not-assumed
+provisioning:
+  endpoint: UNKNOWN_DO_NOT_GUESS
+  graph_credentials_in_application: false
+# Native API permissions remain separate, server-managed OpenViking permissions.

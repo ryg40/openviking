@@ -1,0 +1,1415 @@
+{
+  "words": [
+    {
+      "id": "private-tracker",
+      "pattern": "\\(#\\d+\\)|\\b(?:issue|finding|phase)\\s+#?\\d+\\b"
+    },
+    {
+      "id": "work-record",
+      "pattern": "\\b20\\d\\d-\\d\\d-\\d\\d\\b.*\\b(?:session|verified|deployed|completed|reviewed|handoff)\\b|\\b(?:session|verified|deployed|completed|reviewed|handoff)\\b.*\\b20\\d\\d-\\d\\d-\\d\\d\\b"
+    },
+    {
+      "id": "development-process",
+      "pattern": "\\b(?:the\\s+owner(?!ship| of (?:these|the|a) files)|the\\s+maintainer|coordinator(?![a-z_-])|reviewer\\s+pane|worker\\s+pane|session\\s+handoff|home\\s+lab)\\b"
+    },
+    {
+      "id": "machine-path",
+      "pattern": "(?<![\\w/])(?:/(?:home|Users)/|/opt/(?:stacks|services)/|/root/(?!\\.cache\\b|\\.npm\\b|\\.ccache\\b))[^\\s`\\\"\\x27<>]+"
+    }
+  ],
+  "exceptions": [
+    {
+      "rule": "private-tracker",
+      "line_blob": "60dea49f7c38404940242e452e76bd0231070e3c",
+      "reason": "Upstream change reference retained in a locally changed extension file."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "a035d7b17a60b2b3f2a85f72b0f8f561253db2ed",
+      "reason": "Upstream change reference retained in a locally changed extension file."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "f202f458c17149c168a863f77beb1c6691886a8f",
+      "reason": "Upstream change reference retained in a locally changed extension file."
+    },
+    {
+      "rule": "machine-path",
+      "line_blob": "f6e20569c0e5974b4075394b1740834558775295",
+      "reason": "Upstream synthetic path explains peer identifier normalization; no machine identity."
+    },
+    {
+      "rule": "machine-path",
+      "line_blob": "400b9fd384b3a0564747f25d51d528ae2ddc4082",
+      "reason": "Scanner rule comment describes an upstream synthetic credential fixture."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "1c522e92432bac5faaea34f1e34be05d26829eb8",
+      "reason": "Upstream secret rule identifier, not a development role."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "2ed1fe39ed7df9116d7733c2468b95a838a816d9",
+      "reason": "Sync table explicitly records deleted upstream paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "9cb7b6380e3bf0cc7979b58f82eeb4720cabeac7",
+      "reason": "Sync table explicitly records deleted upstream paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "8f8e20f1dc27ad11a28cec61b1b8984067c89dbe",
+      "reason": "Sync table explicitly records deleted upstream paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "e92beced3c6819ae47070c290bad844fa9e414e6",
+      "reason": "Sync table explicitly records deleted upstream paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "7b05183021c2a4fb95b6ed42eec35f85817e9bca",
+      "reason": "Sync table explicitly records deleted upstream paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "84ba8790a40e5c935106a9ddf7832e8a8cabe687",
+      "reason": "The row names extension-relative files under the explicit extension prefix."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "e5cd5e7f2f6c237671de1a4e99607bfe76afc554",
+      "reason": "Historical upstream Compose filename; the text states its replacement."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "0a6e30681ad2a24c0f44c9864ad11f5975e46ab4",
+      "reason": "Cargo configuration supplied by the reader, outside the source tree."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "11d18bc4f0693b766d9a7d3144e031ebb05bf977",
+      "reason": "Generated image artifacts, not source paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "80fd6e4fbc48570ebf01b91b7ccf2f5e75b98546",
+      "reason": "Generated image artifacts, not source paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "a2ff02bfb050fcdf7853e11b38922f121fd424b6",
+      "reason": "Generated image artifacts, not source paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "e8dd3707a172e9013bdaaf5f4dfe7ca1e9189a3c",
+      "reason": "Generated image artifacts, not source paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "33e0df895fd03357b78f139f06f2b9cce6e715da",
+      "reason": "Generated image artifacts, not source paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "21e79b0f10bb1a5b7c1f88e3c07599d8e8586460",
+      "reason": "Generated image artifacts, not source paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "86a89d1ac028dcc5003c134bf827046ea56814ee",
+      "reason": "Generated image artifacts, not source paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "c3326ee8b0098fafab8ab6877679a461a61e1df6",
+      "reason": "Paths and domains identify external documentation or external source files."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "b092e5d45d5a019eb0518b36eea9ff5cf28f08a0",
+      "reason": "Paths and domains identify external documentation or external source files."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "616ec4baaf70a30219eeffa2812ec350cb28f267",
+      "reason": "Paths and domains identify external documentation or external source files."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "6c4b2978650f0dcd4f90ef8dce13c5b3961f11c0",
+      "reason": "Paths and domains identify external documentation or external source files."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "f96c994cc359328d1e1c296945c744bf50030cda",
+      "reason": "Paths and domains identify external documentation or external source files."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "d30a66f71346f6df3bfbdde226d7a4ee6ab3316b",
+      "reason": "Paths and domains identify external documentation or external source files."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "dfbaa40d122825c635b14725b007f563baab191e",
+      "reason": "Paths and domains identify external documentation or external source files."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "9e14e4dcb97b6abad3d2b68b1cac5748e73f8caf",
+      "reason": "Scanner examples use upstream paths, line suffixes, or generated package paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "82ea3368315c9b565b398fa3d561ba970e4ab0f8",
+      "reason": "Scanner examples use upstream paths, line suffixes, or generated package paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "f1625f8c31ffafd6f577b6f1290c5ca050d3385e",
+      "reason": "Scanner examples use upstream paths, line suffixes, or generated package paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "45c57a820b3ed65c6ad24a0e57511e40005d0a48",
+      "reason": "Scanner examples use upstream paths, line suffixes, or generated package paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "eab50e44fab73efabc148f0852d46f38cb1da6d7",
+      "reason": "Scanner examples use upstream paths, line suffixes, or generated package paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "c98fb518ed90c54aa725b5421a7b84af6f0c30fd",
+      "reason": "Scanner examples use upstream paths, line suffixes, or generated package paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "075191fa915d1ac8173c370d58200fe6974bef46",
+      "reason": "Extension path is source; shared output is explicitly generated."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "72610d1471eaa74da3de2b3e023f1fd5af805894",
+      "reason": "Extension path is source; shared output is explicitly generated."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "2a38685eebf77e176a146ab94131a78ce817a6f2",
+      "reason": "Exact generic pattern declaration; it contains no real host or development record."
+    },
+    {
+      "rule": "machine-path",
+      "line_blob": "2e46d1823a9168a997ff03c0434178ce2b7afe3b",
+      "reason": "Exact generic pattern declaration; it contains no real host or development record."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "93f889dc62ea6f8533325175b8f5e2ca56e7e190",
+      "reason": "Upstream gitleaks configuration path and generated package patterns, not repository files."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "82f41647190c59d213d14b3b829bdc0419f11480",
+      "reason": "Exact upstream extension documentation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "0f1d623b9224c602794c506077200987190eeea8",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "1119673a8823403323bc1c6e168c5e0f765e719b",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "7c23813afc6028a3557c81ad903f2bae568b582a",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "a42ae7e1d9bd268a1b4b3b181ac37a8c580f3dea",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "ead6b454596db7c698e5a4370600cc7256efc317",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "fd2195d6fe1c85ebf60015c9e30bc62e551f160b",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "44c3dff26e891edd8d4e3d28d74580caf8ae0ebf",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "eaa82a0ba0090952f21889b0b65e663bfdd3b478",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "5ff5295ba4028e842e2cea1bc7d41577c3032ee8",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "578b4d423a436d25d5abec3bfdcf37b8102b9b40",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "4ff0979fc3abcf607c06afb624d9c562794472b4",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "4cefbb1a57da6f2fbb3c4a4ce3373b2904291a04",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "0aa11fe07fee049eb1d7b3d1aeecce3371ec6298",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "518370af698ac50a06ba8622fe0b208f8c5252ab",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "3df543f1c90bac08c6b696f4f61d53a40a00d23f",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "5833a2c6527c3644f6aa47866768399244adcd0d",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "4e4d7c086e3194a7bd4abaa89a22454356c4ec83",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "e25ff0797565528ea6ce7174bedfd5e7d296bd99",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "f0e0f6313e1168783d7c005dd99464ab8dff5424",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "ecee350414a3289d8ab45626dc73f1f4a6d6b898",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "2c8621688ad4a0174d1d4cfa54475772a335e3eb",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "08f530eb41e0992c144c9d7ad8efccd530dbd050",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "87b0a7a72e8c242838249b052c45609a6cf1f507",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "0411180fe2b9df4f2a9bca65d5d100712f646f67",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "91eedaefd5db30c5e02e464e0c3cb7d928382939",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "997ccb01a8b05234567dbf422452fc5e7222d214",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "9706e85c8c5634300e813e431e9b6af50466bf84",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "8ad538d2b6163e2fd77998308ef005f3e9e943b8",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "bc2d9db693f5ddfd85244d2b1f6796ad94876ada",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "770052fc7f1dcda215716216b941e23bf7ca70e4",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "7b4cd87faf0bbf1fd563245c7b8c05c0308b4570",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "45354ef74ed8e8fe9b2ed4bec6c9cb3055e99bb6",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "4e0ac6b1391d65a69d73fae583f86dae42745a0c",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "4ecfe5d1515e442741c24f9da5750627e027b71f",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "bb5c1982d33efb615da799f7cc0cfb9a43e00793",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "43e44675c1bce2857a0172a7231bdc564608d205",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "58fa02bfde43aef8d5513b6916dbe4e02fcfc562",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "221e40611ebdf02199aeac072935c0ac98d74a49",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "b577bbff7c41412cf2b9f55ef314056d709c9b95",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "17ced877653227320a324b88e37cd2112ee94c24",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "9b55ce8076b261bc417d4510a38187c569bdf664",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "72ca94d91d46299eeba47386d7b0831a1a9493e2",
+      "reason": "Sync table explicitly records the deleted upstream channel generator."
+    }
+  ],
+  "github_scripts": {
+    ".github/scripts/build-plugin-downloads.sh": {
+      "mode": "100755",
+      "blob": "5d198b8456530c66b41273fc5e630385bdfa62cd"
+    },
+    ".github/scripts/check-marketplace-archive.mjs": {
+      "mode": "100644",
+      "blob": "341702d90c23c5a7db21bf5e8a45bd3e9951e1f1"
+    },
+    ".github/scripts/check-plugin-version-bumps.sh": {
+      "mode": "100755",
+      "blob": "f2a62728b30d9fcfe3dca6ccf605b21e00a100dc"
+    },
+    ".github/scripts/generate-claude-marketplace-json.sh": {
+      "mode": "100644",
+      "blob": "c1057d8012ceca31e4f6a06fe22f36ad635ae845"
+    },
+    ".github/scripts/opencode-release-version.mjs": {
+      "mode": "100644",
+      "blob": "3127f820f988164b00751660490b60024aef69c3"
+    },
+    ".github/scripts/opencode-release-version.test.mjs": {
+      "mode": "100644",
+      "blob": "b7ebc0d1317ab32216a7c59d53d5674a04d23874"
+    },
+    ".github/scripts/publish-dumb-git-repo.sh": {
+      "mode": "100755",
+      "blob": "11c78a6bfc1831a7c357d49eed3cb834c3b4f5b6"
+    },
+    ".github/scripts/reproducible-zip.sh": {
+      "mode": "100755",
+      "blob": "497a4dc60014dd5eb826d30413cadcd9e931b41d"
+    },
+    ".github/scripts/stage-memory-plugin-marketplace.sh": {
+      "mode": "100644",
+      "blob": "944a54b15ad4c17cac42bd2d855a3ccb40c09cb2"
+    },
+    ".github/scripts/stamp-installer-version.sh": {
+      "mode": "100755",
+      "blob": "4558620c3715b20d6c0601dc5b466ef20acd6970"
+    }
+  },
+  "workflows": [
+    ".github/workflows/checks.yml"
+  ],
+  "path_placeholders": [
+    {
+      "pattern": "<storage\\.workspace>/bot/logs/",
+      "reason": "Runtime workspace placeholder, not a source directory."
+    },
+    {
+      "pattern": "\\.env(?:\\.\\*)?",
+      "reason": "Generated local environment file, never tracked."
+    },
+    {
+      "pattern": "(?:\\./)?data(?:/.*)?",
+      "reason": "Generated runtime state, never tracked."
+    },
+    {
+      "pattern": "\\.local(?:/.*)?",
+      "reason": "Ignored host override or local policy file."
+    },
+    {
+      "pattern": "\\.git(?:/.*)?",
+      "reason": "Git metadata made by clone and hook installation."
+    },
+    {
+      "pattern": "(?:refs|topic|sync)/.*",
+      "reason": "Git ref notation, not a repository file."
+    },
+    {
+      "pattern": "(?:linux|type)/(?:amd64|arm64|docker)",
+      "reason": "Platform or output notation, not a repository file."
+    },
+    {
+      "pattern": "openviking/\\.git/",
+      "reason": "Clone destination Git metadata."
+    },
+    {
+      "pattern": "ov(?:cli)?\\.conf",
+      "reason": "Runtime configuration basename."
+    },
+    {
+      "pattern": "openviking/_version\\.py",
+      "reason": "Version file generated during the build."
+    },
+    {
+      "pattern": "(?:RUST|NODE|PYTHON)_IMAGE",
+      "reason": "Build variable, not a path."
+    },
+    {
+      "pattern": "\\.{1,2}",
+      "reason": "Current or parent directory notation."
+    },
+    {
+      "pattern": "\\.gitleaks(?:ignore|baseline)",
+      "reason": "Forbidden policy filename used to explain a check."
+    },
+    {
+      "pattern": "\\.env\\*|\\.venv|\\.pyc",
+      "reason": "Ignored environment files or generated Python artifacts."
+    },
+    {
+      "pattern": "\\.base\\.digest",
+      "reason": "Image label suffix, not a repository path."
+    },
+    {
+      "pattern": "(?:linux/(?:amd64|arm64))(?:,linux/(?:amd64|arm64))*",
+      "reason": "Docker platform list."
+    },
+    {
+      "pattern": "(?:registry|mirror)\\.example\\.(?:com|invalid)/.*",
+      "reason": "Neutral registry placeholder."
+    },
+    {
+      "pattern": "scripts/git-hooks/<hook>",
+      "reason": "Placeholder for a hook name."
+    },
+    {
+      "pattern": "(?:lib/)?python3\\.\\*|\\*\\.dist-info|target/",
+      "reason": "Generated package or build artifact pattern."
+    },
+    {
+      "pattern": "upstream/main",
+      "reason": "Remote-tracking ref, not a source path."
+    },
+    {
+      "pattern": "<git-common-dir>/scan-hooks/",
+      "reason": "Placeholder for Git metadata directory."
+    },
+    {
+      "pattern": "tests/test_\\*\\.sh",
+      "reason": "Shell test glob; individual paths have their own checks."
+    }
+  ],
+  "defaults": [
+    {
+      "name": "OPENVIKING_ROOT_API_KEY",
+      "section": "Docker Compose (`compose.yaml`, set in `.env`):",
+      "sources": [
+        {
+          "path": ".env.example",
+          "pattern": "^OPENVIKING_ROOT_API_KEY=(.*)$"
+        },
+        {
+          "path": "compose.yaml",
+          "pattern": "\\$\\{OPENVIKING_ROOT_API_KEY:\\?[^}]+\\}"
+        }
+      ],
+      "document": "None; required"
+    },
+    {
+      "name": "OPENVIKING_ROOT_API_KEY",
+      "section": "<summary>Details: the variables in <code>.env</code>",
+      "sources": [
+        {
+          "path": ".env.example",
+          "pattern": "^OPENVIKING_ROOT_API_KEY=(.*)$"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_IMAGE",
+      "section": "Docker Compose (`compose.yaml`, set in `.env`):",
+      "sources": [
+        {
+          "path": ".env.example",
+          "pattern": "^OPENVIKING_IMAGE=(.*)$"
+        },
+        {
+          "path": "compose.yaml",
+          "pattern": "\\$\\{OPENVIKING_IMAGE:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_IMAGE",
+      "section": "<summary>Details: the variables in <code>.env</code>",
+      "sources": [
+        {
+          "path": ".env.example",
+          "pattern": "^OPENVIKING_IMAGE=(.*)$"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_PUBLIC_BASE_URL",
+      "section": "Docker Compose (`compose.yaml`, set in `.env`):",
+      "sources": [
+        {
+          "path": ".env.example",
+          "pattern": "^OPENVIKING_PUBLIC_BASE_URL=(.*)$"
+        },
+        {
+          "path": "compose.yaml",
+          "pattern": "\\$\\{OPENVIKING_PUBLIC_BASE_URL:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_PUBLIC_BASE_URL",
+      "section": "<summary>Details: the variables in <code>.env</code>",
+      "sources": [
+        {
+          "path": ".env.example",
+          "pattern": "^OPENVIKING_PUBLIC_BASE_URL=(.*)$"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_BIND",
+      "section": "Docker Compose (`compose.yaml`, set in `.env`):",
+      "sources": [
+        {
+          "path": ".env.example",
+          "pattern": "^OPENVIKING_BIND=(.*)$"
+        },
+        {
+          "path": "compose.yaml",
+          "pattern": "\\$\\{OPENVIKING_BIND:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_BIND",
+      "section": "<summary>Details: the variables in <code>.env</code>",
+      "sources": [
+        {
+          "path": ".env.example",
+          "pattern": "^OPENVIKING_BIND=(.*)$"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_PORT",
+      "section": "Docker Compose (`compose.yaml`, set in `.env`):",
+      "sources": [
+        {
+          "path": ".env.example",
+          "pattern": "^OPENVIKING_PORT=(.*)$"
+        },
+        {
+          "path": "compose.yaml",
+          "pattern": "\\$\\{OPENVIKING_PORT:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_PORT",
+      "section": "<summary>Details: the variables in <code>.env</code>",
+      "sources": [
+        {
+          "path": ".env.example",
+          "pattern": "^OPENVIKING_PORT=(.*)$"
+        }
+      ]
+    },
+    {
+      "name": "COMPOSE_FILE",
+      "section": "Docker Compose (`compose.yaml`, set in `.env`):",
+      "sources": [
+        {
+          "path": "compose.yaml",
+          "pattern": "^services:"
+        }
+      ],
+      "document": "Not set: Compose reads `compose\\.yaml`"
+    },
+    {
+      "name": "OPENVIKING_CONFIG_FILE",
+      "section": "The container (`Dockerfile` and `deploy/docker/openviking-entrypoint.sh`):",
+      "sources": [
+        {
+          "path": "Dockerfile",
+          "pattern": "OPENVIKING_CONFIG_FILE=\"([^\"]+)\""
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_CLI_CONFIG_FILE",
+      "section": "The container (`Dockerfile` and `deploy/docker/openviking-entrypoint.sh`):",
+      "sources": [
+        {
+          "path": "Dockerfile",
+          "pattern": "OPENVIKING_CLI_CONFIG_FILE=\"([^\"]+)\""
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_SERVER_HOST",
+      "section": "The container (`Dockerfile` and `deploy/docker/openviking-entrypoint.sh`):",
+      "sources": [
+        {
+          "path": "deploy/docker/openviking-entrypoint.sh",
+          "pattern": "\\$\\{OPENVIKING_SERVER_HOST:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_WITH_BOT",
+      "section": "The container (`Dockerfile` and `deploy/docker/openviking-entrypoint.sh`):",
+      "sources": [
+        {
+          "path": "deploy/docker/openviking-entrypoint.sh",
+          "pattern": "\\$\\{OPENVIKING_WITH_BOT:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_HEALTH_MAX_ATTEMPTS",
+      "section": "The container (`Dockerfile` and `deploy/docker/openviking-entrypoint.sh`):",
+      "sources": [
+        {
+          "path": "deploy/docker/openviking-entrypoint.sh",
+          "pattern": "\\$\\{OPENVIKING_HEALTH_MAX_ATTEMPTS:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_SERVER_PORT",
+      "section": "The container (`Dockerfile` and `deploy/docker/openviking-entrypoint.sh`):",
+      "sources": [
+        {
+          "path": "deploy/docker/openviking-entrypoint.sh",
+          "pattern": "\\(config\\.get\\(\"server\"\\) or \\{\\}\\)\\.get\\(\"port\", (1933)\\)",
+          "value": "1933"
+        }
+      ],
+      "document": "`server\\.port` of `ov\\.conf`, else `1933`"
+    },
+    {
+      "name": "OPENVIKING_CONF_CONTENT",
+      "section": "The container (`Dockerfile` and `deploy/docker/openviking-entrypoint.sh`):",
+      "sources": [
+        {
+          "path": "deploy/docker/openviking-entrypoint.sh",
+          "pattern": "\\$\\{OPENVIKING_CONF_CONTENT:-\\}"
+        }
+      ],
+      "document": "Not set"
+    },
+    {
+      "name": "UPSTREAM_URL",
+      "section": "`scripts/setup-remotes.sh` and `scripts/fetch-upstream.sh`:",
+      "sources": [
+        {
+          "path": "scripts/setup-remotes.sh",
+          "pattern": "\\$\\{UPSTREAM_URL:-([^}]*)\\}"
+        }
+      ]
+    },
+    {
+      "name": "SHARED_URL",
+      "section": "`scripts/setup-remotes.sh` and `scripts/fetch-upstream.sh`:",
+      "sources": [
+        {
+          "path": "scripts/setup-remotes.sh",
+          "pattern": "\\$\\{SHARED_URL:-([^}]*)\\}"
+        }
+      ]
+    },
+    {
+      "name": "SHARED_REMOTE",
+      "section": "`scripts/setup-remotes.sh` and `scripts/fetch-upstream.sh`:",
+      "sources": [
+        {
+          "path": "scripts/setup-remotes.sh",
+          "pattern": "\\$\\{SHARED_REMOTE:-([^}]*)\\}"
+        }
+      ]
+    },
+    {
+      "name": "GATEWAY_IMAGE",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "docker-bake.hcl",
+          "pattern": "variable \"GATEWAY_IMAGE\" \\{\\s*default = \"?([^\"\\s\\n]*)\"?\\s*\\}"
+        }
+      ]
+    },
+    {
+      "name": "SOURCE_URL",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "docker-bake.hcl",
+          "pattern": "variable \"SOURCE_URL\" \\{\\s*default = \"?([^\"\\s\\n]*)\"?\\s*\\}"
+        }
+      ]
+    },
+    {
+      "name": "UV_LOCK_STRATEGY",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "docker-bake.hcl",
+          "pattern": "variable \"UV_LOCK_STRATEGY\" \\{\\s*default = \"?([^\"\\s\\n]*)\"?\\s*\\}"
+        }
+      ]
+    },
+    {
+      "name": "REGISTRY_PREFIX",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "docker-bake.hcl",
+          "pattern": "variable \"REGISTRY_PREFIX\" \\{\\s*default = \"?([^\"\\s\\n]*)\"?\\s*\\}"
+        }
+      ]
+    },
+    {
+      "name": "PROVENANCE",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "docker-bake.hcl",
+          "pattern": "variable \"PROVENANCE\" \\{\\s*default = \"?([^\"\\s\\n]*)\"?\\s*\\}"
+        }
+      ]
+    },
+    {
+      "name": "RELEASE_IMAGE",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "docker-bake.hcl",
+          "pattern": "variable \"RELEASE_IMAGE\" \\{\\s*default = \"?([^\"\\s\\n]*)\"?\\s*\\}"
+        }
+      ]
+    },
+    {
+      "name": "RELEASE_PLATFORMS",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "docker-bake.hcl",
+          "pattern": "variable \"RELEASE_PLATFORMS\" \\{\\s*default = \"?([^\"\\s\\n]*)\"?\\s*\\}"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_VERSION",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "scripts/build.sh",
+          "pattern": "OPENVIKING_VERSION=\\$UPSTREAM_VERSION\\+p"
+        }
+      ],
+      "document": "Computed: `<upstream>\\+p<portable>`"
+    },
+    {
+      "name": "PORTABLE_VERSION",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "scripts/build.sh",
+          "pattern": "PORTABLE_VERSION=0-g\\$sha"
+        }
+      ],
+      "document": "Computed from the nearest tag `portable-v\\*`, else `0-g<8 hex digits>`"
+    },
+    {
+      "name": "REVISION",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "scripts/build.sh",
+          "pattern": "REVISION:=\\$\\(git rev-parse HEAD\\)"
+        }
+      ],
+      "document": "Computed: `git rev-parse HEAD`"
+    },
+    {
+      "name": "SOURCE_DATE_EPOCH",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "scripts/build.sh",
+          "pattern": "SOURCE_DATE_EPOCH:=\\$\\(git log -1 --format=%ct HEAD\\)"
+        }
+      ],
+      "document": "Computed: the commit time of `HEAD`"
+    },
+    {
+      "name": "BUILDX_BUILDER",
+      "section": "`scripts/build.sh` and `docker-bake.hcl`:",
+      "sources": [
+        {
+          "path": "scripts/build.sh",
+          "pattern": "BUILDX_BUILDER pass through"
+        }
+      ],
+      "document": "Not set: the current builder"
+    },
+    {
+      "name": "REGISTRY_PREFIX",
+      "section": "Build arguments of the `Dockerfile`:",
+      "sources": [
+        {
+          "path": "Dockerfile",
+          "pattern": "^ARG REGISTRY_PREFIX=(.*)$"
+        }
+      ]
+    },
+    {
+      "name": "RUST_IMAGE",
+      "section": "Build arguments of the `Dockerfile`:",
+      "sources": [
+        {
+          "path": "Dockerfile",
+          "pattern": "^ARG RUST_IMAGE=(.*)$"
+        }
+      ],
+      "document": "Its `ARG` value in `Dockerfile`"
+    },
+    {
+      "name": "NODE_IMAGE",
+      "section": "Build arguments of the `Dockerfile`:",
+      "sources": [
+        {
+          "path": "Dockerfile",
+          "pattern": "^ARG NODE_IMAGE=(.*)$"
+        }
+      ],
+      "document": "Its `ARG` value in `Dockerfile`"
+    },
+    {
+      "name": "PYTHON_IMAGE",
+      "section": "Build arguments of the `Dockerfile`:",
+      "sources": [
+        {
+          "path": "Dockerfile",
+          "pattern": "^ARG PYTHON_IMAGE=(.*)$"
+        }
+      ],
+      "document": "Its `ARG` value in `Dockerfile`"
+    },
+    {
+      "name": "OPENVIKING_VERSION",
+      "section": "Build arguments of the `Dockerfile`:",
+      "sources": [
+        {
+          "path": "Dockerfile",
+          "pattern": "^ARG OPENVIKING_VERSION=(.*)$"
+        }
+      ]
+    },
+    {
+      "name": "UV_LOCK_STRATEGY",
+      "section": "Build arguments of the `Dockerfile`:",
+      "sources": [
+        {
+          "path": "Dockerfile",
+          "pattern": "^ARG UV_LOCK_STRATEGY=(.*)$"
+        }
+      ]
+    },
+    {
+      "name": "SCAN_ENGINE",
+      "section": "`scripts/scan.sh`:\n",
+      "sources": [
+        {
+          "path": "scripts/scan.sh",
+          "pattern": "\\$\\{SCAN_ENGINE:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "SCAN_NAME_PREFIX",
+      "section": "`scripts/scan.sh`:\n",
+      "sources": [
+        {
+          "path": "scripts/scan.sh",
+          "pattern": "\\$\\{SCAN_NAME_PREFIX:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "SCAN_IMAGE_METHOD",
+      "section": "`scripts/scan.sh`:\n",
+      "sources": [
+        {
+          "path": "scripts/scan.sh",
+          "pattern": "\\$\\{SCAN_IMAGE_METHOD:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "GITLEAKS_IMAGE",
+      "section": "`scripts/scan.sh`:\n",
+      "sources": [
+        {
+          "path": "scripts/scan.sh",
+          "pattern": "^GITLEAKS_IMAGE="
+        }
+      ],
+      "document": "The pinned reference of step 13"
+    },
+    {
+      "name": "SCAN_REF",
+      "section": "`scripts/scan.sh`:\n",
+      "sources": [
+        {
+          "path": "scripts/scan.sh",
+          "pattern": "\\$\\{SCAN_REF:-\\}"
+        }
+      ],
+      "document": "Not set: the current branch and the tags at `HEAD`"
+    },
+    {
+      "name": "SCAN_EXCLUDE_UPSTREAM",
+      "section": "`scripts/scan.sh`:\n",
+      "sources": [
+        {
+          "path": "scripts/scan.sh",
+          "pattern": "\\$\\{SCAN_EXCLUDE_UPSTREAM:-\\}"
+        }
+      ],
+      "document": "Not set"
+    },
+    {
+      "name": "TMPDIR",
+      "section": "`scripts/scan.sh`:\n",
+      "sources": [
+        {
+          "path": "scripts/scan.sh",
+          "pattern": "\\$\\{TMPDIR:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "TEST_NAME_PREFIX",
+      "section": "Tests:\n\n| Variable | Default |",
+      "sources": [
+        {
+          "path": "tests/test_image.sh",
+          "pattern": "\\$\\{TEST_NAME_PREFIX:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "EXPECTED_USER",
+      "section": "Tests:\n\n| Variable | Default |",
+      "sources": [
+        {
+          "path": "tests/test_image.sh",
+          "pattern": "\\$\\{EXPECTED_USER:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "HEALTH_TIMEOUT",
+      "section": "Tests:\n\n| Variable | Default |",
+      "sources": [
+        {
+          "path": "tests/test_image.sh",
+          "pattern": "\\$\\{HEALTH_TIMEOUT:-([^}]+)\\}"
+        },
+        {
+          "path": "tests/test_compose.sh",
+          "pattern": "\\$\\{HEALTH_TIMEOUT:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "OPENVIKING_IMAGE",
+      "section": "Tests:\n\n| Variable | Default |",
+      "sources": [
+        {
+          "path": "tests/test_compose.sh",
+          "pattern": "\\$\\{OPENVIKING_IMAGE:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "COMPOSE_TEST_PROJECT",
+      "section": "Tests:\n\n| Variable | Default |",
+      "sources": [
+        {
+          "path": "tests/test_compose.sh",
+          "pattern": "\\$\\{COMPOSE_TEST_PROJECT:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "TEST_NETWORK",
+      "section": "Tests:\n\n| Variable | Default |",
+      "sources": [
+        {
+          "path": "tests/test_setup_remotes.sh",
+          "pattern": "\\$\\{TEST_NETWORK:-([^}]+)\\}"
+        }
+      ]
+    },
+    {
+      "name": "EXPECTED_VERSION",
+      "section": "Tests:\n\n| Variable | Default |",
+      "sources": [
+        {
+          "path": "tests/test_image.sh",
+          "pattern": "\\$\\{EXPECTED_VERSION:-\\}"
+        }
+      ],
+      "document": "Not set"
+    },
+    {
+      "name": "COMPOSE_TEST_DIR",
+      "section": "Tests:\n\n| Variable | Default |",
+      "sources": [
+        {
+          "path": "tests/test_compose.sh",
+          "pattern": "\\$\\{COMPOSE_TEST_DIR:-\\}"
+        }
+      ],
+      "document": "Not set: a new temporary directory"
+    }
+  ],
+  "pins": {
+    "sources": [
+      {
+        "id": "upstream-tag",
+        "path": "scripts/upstream-base",
+        "pattern": "^tag\\t([^\\t]+)\\t"
+      },
+      {
+        "id": "upstream-version",
+        "path": "scripts/upstream-base",
+        "pattern": "^tag\\t([^\\t]+)\\t",
+        "transform": "strip-v"
+      },
+      {
+        "id": "upstream-commit",
+        "path": "scripts/upstream-base",
+        "pattern": "^tag\\t[^\\t]+\\t([0-9a-f]{40})$"
+      },
+      {
+        "id": "frontend-image",
+        "path": "Dockerfile",
+        "pattern": "^# syntax=([^@]+)@"
+      },
+      {
+        "id": "frontend-digest",
+        "path": "Dockerfile",
+        "pattern": "^# syntax=[^@]+@(sha256:[0-9a-f]{64})$"
+      },
+      {
+        "id": "rust-image",
+        "path": "Dockerfile",
+        "pattern": "^ARG RUST_IMAGE=(\\S+)$"
+      },
+      {
+        "id": "rust-digest",
+        "path": "Dockerfile",
+        "pattern": "^ARG RUST_DIGEST=(\\S+)$"
+      },
+      {
+        "id": "node-image",
+        "path": "Dockerfile",
+        "pattern": "^ARG NODE_IMAGE=(\\S+)$"
+      },
+      {
+        "id": "node-digest",
+        "path": "Dockerfile",
+        "pattern": "^ARG NODE_DIGEST=(\\S+)$"
+      },
+      {
+        "id": "python-image",
+        "path": "Dockerfile",
+        "pattern": "^ARG PYTHON_IMAGE=(\\S+)$"
+      },
+      {
+        "id": "python-digest",
+        "path": "Dockerfile",
+        "pattern": "^ARG PYTHON_DIGEST=(\\S+)$"
+      },
+      {
+        "id": "uv-version",
+        "path": "Dockerfile",
+        "pattern": "^RUN printf .*?uv==([0-9.]+) "
+      },
+      {
+        "id": "uv-hash",
+        "path": "Dockerfile",
+        "pattern": "--hash=(sha256:[0-9a-f]{64})"
+      },
+      {
+        "id": "scanner-image",
+        "path": "scripts/scan.sh",
+        "pattern": "^GITLEAKS_IMAGE=\\$\\{GITLEAKS_IMAGE:-([^}]+)\\}$"
+      },
+      {
+        "id": "scanner-version",
+        "path": "scripts/scan.sh",
+        "pattern": "^GITLEAKS_IMAGE=\\$\\{GITLEAKS_IMAGE:-[^@\\n]+:(v[0-9.]+)@"
+      },
+      {
+        "id": "scanner-version-bare",
+        "path": "scripts/scan.sh",
+        "pattern": "^GITLEAKS_IMAGE=\\$\\{GITLEAKS_IMAGE:-[^@\\n]+:(v[0-9.]+)@",
+        "transform": "strip-v"
+      },
+      {
+        "id": "scanner-digest",
+        "path": "scripts/scan.sh",
+        "pattern": "^GITLEAKS_IMAGE=\\$\\{GITLEAKS_IMAGE:-[^@\\n]+@(sha256:[0-9a-f]{64})\\}$"
+      }
+    ],
+    "allowed": [
+      {
+        "path": "docker-bake.hcl",
+        "pattern": "  default = \"[^\"\\n]+\"",
+        "values": [
+          "rust-image"
+        ],
+        "reason": "Required bake copy; freshness checks the matching variable block.",
+        "block": "variable \"RUST_IMAGE\" \\{"
+      },
+      {
+        "path": "docker-bake.hcl",
+        "pattern": "  default = \"[^\"\\n]+\"",
+        "values": [
+          "rust-digest"
+        ],
+        "reason": "Required bake copy; freshness checks the matching variable block.",
+        "block": "variable \"RUST_DIGEST\" \\{"
+      },
+      {
+        "path": "Dockerfile",
+        "pattern": "# (?:rust|node|python):[^\\n]+",
+        "values": [
+          "rust-image"
+        ],
+        "reason": "Source pin annotation beside its ARG."
+      },
+      {
+        "path": "docker-bake.hcl",
+        "pattern": "  default = \"[^\"\\n]+\"",
+        "values": [
+          "node-image"
+        ],
+        "reason": "Required bake copy; freshness checks the matching variable block.",
+        "block": "variable \"NODE_IMAGE\" \\{"
+      },
+      {
+        "path": "docker-bake.hcl",
+        "pattern": "  default = \"[^\"\\n]+\"",
+        "values": [
+          "node-digest"
+        ],
+        "reason": "Required bake copy; freshness checks the matching variable block.",
+        "block": "variable \"NODE_DIGEST\" \\{"
+      },
+      {
+        "path": "Dockerfile",
+        "pattern": "# (?:rust|node|python):[^\\n]+",
+        "values": [
+          "node-image"
+        ],
+        "reason": "Source pin annotation beside its ARG."
+      },
+      {
+        "path": "docker-bake.hcl",
+        "pattern": "  default = \"[^\"\\n]+\"",
+        "values": [
+          "python-image"
+        ],
+        "reason": "Required bake copy; freshness checks the matching variable block.",
+        "block": "variable \"PYTHON_IMAGE\" \\{"
+      },
+      {
+        "path": "docker-bake.hcl",
+        "pattern": "  default = \"[^\"\\n]+\"",
+        "values": [
+          "python-digest"
+        ],
+        "reason": "Required bake copy; freshness checks the matching variable block.",
+        "block": "variable \"PYTHON_DIGEST\" \\{"
+      },
+      {
+        "path": "Dockerfile",
+        "pattern": "# (?:rust|node|python):[^\\n]+",
+        "values": [
+          "python-image"
+        ],
+        "reason": "Source pin annotation beside its ARG."
+      },
+      {
+        "path": "EXPLAINER.md",
+        "pattern": "\\| Image version \\|.*for example.*",
+        "values": [
+          "upstream-tag",
+          "upstream-version"
+        ],
+        "reason": "One illustrative format example, not a current release claim.",
+        "line_blob": "f9dc3086d5d3597e2dd20951cd2db3a3a10690a0"
+      },
+      {
+        "path": "docs/branches.md",
+        "pattern": "`scripts/build.sh` uses `X.Y.Z`.*for example.*",
+        "values": [
+          "upstream-tag",
+          "upstream-version"
+        ],
+        "reason": "One illustrative format example, not a current release claim.",
+        "line_blob": "4a85d08bb4d60f47efebc10762132a11c580b09f"
+      },
+      {
+        "path": "docs/image.md",
+        "pattern": "for example `.*\\+p.*",
+        "values": [
+          "upstream-tag",
+          "upstream-version"
+        ],
+        "reason": "One illustrative format example, not a current release claim.",
+        "line_blob": "1d9279c5f18d1cb6d500fc36bfb817f452004aa1"
+      },
+      {
+        "path": ".gitleaks.toml",
+        "pattern": "(?:# .*gitleaks v.*|title = \"openviking secret scan.*)",
+        "values": [
+          "scanner-version",
+          "scanner-version-bare"
+        ],
+        "reason": "Exact ruleset provenance, not the runtime scanner source.",
+        "line_blob": "be7cccfab207351460fcac8bf800842c719d7f13"
+      },
+      {
+        "path": ".gitleaks.toml",
+        "pattern": "(?:# .*gitleaks v.*|title = \"openviking secret scan.*)",
+        "values": [
+          "scanner-version",
+          "scanner-version-bare"
+        ],
+        "reason": "Exact ruleset provenance, not the runtime scanner source.",
+        "line_blob": "f2d91da4f97dcce0cabe8effc12e2e220a9f765e"
+      },
+      {
+        "path": ".gitleaks.toml",
+        "pattern": "(?:# .*gitleaks v.*|title = \"openviking secret scan.*)",
+        "values": [
+          "scanner-version",
+          "scanner-version-bare"
+        ],
+        "reason": "Exact ruleset provenance, not the runtime scanner source.",
+        "line_blob": "e667d2a0531f9d953c5181c8bf3bcac3f122defb"
+      },
+      {
+        "path": "scripts/scan.sh",
+        "pattern": "GITLEAKS_VERSION=v[0-9.]+",
+        "values": [
+          "scanner-version",
+          "scanner-version-bare"
+        ],
+        "reason": "Binary version must equal the scanner image version."
+      },
+      {
+        "path": "EXPLAINER.md",
+        "pattern": "\\| `rust-toolchain` \\| `RUST_IMAGE` \\(`[^`]+`\\) \\| .*",
+        "values": [
+          "rust-image"
+        ],
+        "reason": "Stage cell is the single documented image name; freshness checks its ARG."
+      },
+      {
+        "path": "EXPLAINER.md",
+        "pattern": "\\| `web-studio-builder` \\| `NODE_IMAGE` \\(`[^`]+`\\) \\| .*",
+        "values": [
+          "node-image"
+        ],
+        "reason": "Stage cell is the single documented image name; freshness checks its ARG."
+      },
+      {
+        "path": "EXPLAINER.md",
+        "pattern": "\\| `py-builder` \\| `PYTHON_IMAGE` \\(`[^`]+`\\) \\| .*",
+        "values": [
+          "python-image"
+        ],
+        "reason": "Stage cell is the single documented image name; freshness checks its ARG."
+      }
+    ]
+  }
+}

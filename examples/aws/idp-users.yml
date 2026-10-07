@@ -1,0 +1,28 @@
+# ILLUSTRATIVE ONLY. The internal Graph service schema is unknown.
+# Do not submit this file to that service without an approved translator.
+schema_status: illustrative-not-a-service-contract
+application:
+  # Use a separate Entra registration for this browser boundary.
+  logical_name: openviking-browser-staging
+  tenant_id: REPLACE_TENANT_ID
+  client_id: REPLACE_CLIENT_ID
+  app_url: https://ov-browser-staging.example.invalid
+  callbacks:
+    - https://ov-browser-staging.example.invalid/oauth2/callback
+  # The identity team must set this on the enterprise application.
+  assignment_required: true
+identity_mapping:
+  # Confirm the actual LDAP anchor and Entra synchronization rules.
+  source: ldap
+  source_anchor_attribute: REPLACE_APPROVED_IMMUTABLE_ATTRIBUTE
+  target: entra_object_id
+users:
+  # Example IDs identify no real person. Replace them through identity review.
+  - ldap_dn: uid=example-user,ou=people,dc=example,dc=invalid
+    entra_object_id: REPLACE_USER_OBJECT_ID
+    permissions: [browser-login]
+# Browser permission grants no native OpenViking tenant or administrator role.
+provisioning:
+  operator: approved-internal-identity-service
+  endpoint: UNKNOWN_DO_NOT_GUESS
+  graph_credentials_in_application: false

@@ -1,0 +1,93 @@
+name: 'Development updates'
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: sh
+concurrency:
+  group: 'openviking-development-update'
+  cancel-in-progress: false
+env:
+  UPDATE_WORK: '${{ runner.temp }}/openviking-update-${{ gitea.run_id }}-${{ gitea.run_attempt }}'
+  UPDATE_SERVER: '${{ gitea.server_url }}'
+  UPDATE_REPOSITORY: '${{ gitea.repository }}'
+jobs:
+  detect:
+    if: "${{ gitea.ref == 'refs/heads/local-dev' }}"
+    runs-on: kit-amd64
+    timeout-minutes: 15
+    outputs:
+      proposed: '${{ steps.detect.outputs.proposed }}'
+    steps:
+      - name: 'Full development checkout'
+        uses: https://github.com/actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          github-server-url: '${{ gitea.server_url }}'
+          repository: '${{ gitea.repository }}'
+          ref: '${{ gitea.sha }}'
+      - name: 'Detect public candidates'
+        id: detect
+        run: |
+          set -eu
+          mkdir -p "$UPDATE_WORK"
+          code=0
+          python3 scripts/upstream-update.py detect > "$UPDATE_WORK/detect.json" || code=$?
+          case "$code" in
+            0) echo 'proposed=false' >> "$GITHUB_OUTPUT" ;;
+            10) echo 'proposed=true' >> "$GITHUB_OUTPUT" ;;
+            *) exit "$code" ;;
+          esac
+      - name: 'Detection evidence'
+        if: '${{ always() }}'
+        uses: https://github.com/actions/upload-artifact@c6a366c94c3e0affe28c06c8df20a878f24da3cf # v3.2.2
+        with:
+          name: 'update-detection'
+          path: '${{ env.UPDATE_WORK }}/detect.json'
+          if-no-files-found: error
+          retention-days: 7
+  qualify:
+    needs: detect
+    if: "${{ needs.detect.outputs.proposed == 'true' && gitea.ref == 'refs/heads/local-dev' }}"
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    runs-on: kit-amd64
+    timeout-minutes: 90
+    steps:
+      - name: 'Full development checkout'
+        uses: https://github.com/actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          github-server-url: '${{ gitea.server_url }}'
+          repository: '${{ gitea.repository }}'
+          ref: '${{ gitea.sha }}'
+      - name: 'Read detection evidence'
+        uses: https://github.com/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
+        with:
+          name: 'update-detection'
+          path: '${{ env.UPDATE_WORK }}'
+      - name: 'Node for qualification tests'
+        uses: https://github.com/actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: 'Qualify, read notes and propose one candidate'
+        env:
+          UPDATE_TOKEN: '${{ secrets.UPDATE_TOKEN || secrets.GITEA_TOKEN }}'
+        run: |
+          python3 scripts/update-propose.py
+      - name: 'Qualification evidence'
+        if: '${{ always() }}'
+        uses: https://github.com/actions/upload-artifact@c6a366c94c3e0affe28c06c8df20a878f24da3cf # v3.2.2
+        with:
+          name: 'update-evidence'
+          path: '${{ env.UPDATE_WORK }}'
+          if-no-files-found: error
+          retention-days: 7

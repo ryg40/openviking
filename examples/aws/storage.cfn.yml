@@ -1,0 +1,49 @@
+# Inactive storage example. Read storage.cfn.md before deployment.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Separate encrypted OpenViking storage for an existing EC2 host
+Parameters:
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: Select the existing host availability zone.
+  ExistingInstanceId:
+    Type: AWS::EC2::Instance::Id
+    Description: Select an approved host in the same availability zone.
+  KmsKeyArn:
+    Type: String
+    AllowedPattern: 'arn:[a-z-]+:kms:[a-z0-9-]+:[0-9]{12}:key/.+'
+    Description: Supply an existing approved encryption key ARN.
+  SizeGiB:
+    Type: Number
+    Default: 40
+    MinValue: 20
+    Description: Trial capacity only. Size from measured growth.
+Resources:
+  StateVolume:
+    Type: AWS::EC2::Volume
+    # Retain state when the stack is removed or the volume is replaced.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      Encrypted: true
+      KmsKeyId: !Ref KmsKeyArn
+      Size: !Ref SizeGiB
+      VolumeType: gp3
+      Tags:
+        - Key: Application
+          Value: openviking
+        # An existing AWS Backup policy must select this tag.
+        # The tag alone does not create a backup or ensure consistency.
+        - Key: BackupPolicy
+          Value: REPLACE_APPROVED_POLICY
+  StateAttachment:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      InstanceId: !Ref ExistingInstanceId
+      VolumeId: !Ref StateVolume
+      # Nitro hosts expose NVMe names. Identify the disk by volume ID.
+      Device: /dev/sdf
+Outputs:
+  VolumeId:
+    Description: Identify this volume before any filesystem operation.
+    Value: !Ref StateVolume

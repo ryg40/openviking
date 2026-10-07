@@ -1,0 +1,41 @@
+# Allowlist: exclude everything, then permit only the paths that the COPY
+# lines of the Dockerfile read. Secrets and state (.env, data/, .local/) and
+# the Git metadata never reach the builder. Update this list together with
+# the COPY lines. See docs/image.md.
+*
+
+!Cargo.toml
+!Cargo.lock
+!pyproject.toml
+!uv.lock
+!setup.py
+!README.md
+!scripts/build_support/
+!bot/
+!crates/
+!openviking/
+!openviking_cli/
+!src/
+!third_party/
+!web-studio/
+!deploy/docker/openviking-entrypoint.sh
+!deploy/docker/pending_health_server.py
+
+# Local development artifacts inside the permitted paths (the upstream list,
+# made to match at every depth).
+**/.env*
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+**/target/
+**/node_modules
+**/*.log
+**/*.tmp
+src/build/
+web-studio/dist
+web-studio/.vite
+openviking/web_studio/dist

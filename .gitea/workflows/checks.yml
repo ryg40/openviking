@@ -1,0 +1,105 @@
+name: 'Development checks'
+on:
+  push:
+    branches:
+      - 'local-dev'
+      - 'topic/**'
+      - 'sync/**'
+  pull_request:
+    branches:
+      - 'local-dev'
+      - 'topic/**'
+      - 'sync/**'
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: sh
+env:
+  CI_REF: '${{ gitea.ref }}'
+  SCAN_NAME_PREFIX: 'openviking-ci-'
+  CI_RUN: '${{ gitea.run_id }}'
+  CI_ATTEMPT: '${{ gitea.run_attempt }}'
+  SOURCE_URL: '${{ gitea.server_url }}/${{ gitea.repository }}'
+jobs:
+  fast:
+    runs-on: kit-amd64
+    timeout-minutes: 15
+    steps:
+      - name: 'Full checkout'
+        uses: https://github.com/actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          github-server-url: '${{ gitea.server_url }}'
+          repository: '${{ gitea.repository }}'
+          ref: '${{ gitea.sha }}'
+      - name: 'Require full history'
+        run: |
+          test "$(git rev-parse --is-shallow-repository)" = false
+      - name: 'Scanner image'
+        run: |
+          docker pull "$(sed -n 's/^GITLEAKS_IMAGE=${GITLEAKS_IMAGE:-\(.*\)}$/\1/p' scripts/scan.sh)"
+      - name: 'Tree and history scans'
+        run: |
+          SCAN_REF="$CI_REF" sh scripts/scan.sh tree
+          SCAN_REF="$CI_REF" sh scripts/scan.sh history
+      - name: 'Public tree check'
+        run: |
+          sh scripts/public-check.sh
+      - name: 'Offline shell tests'
+        run: |
+          sh tests/test_setup_remotes.sh
+          sh tests/test_promotion.sh
+          sh tests/test_build_version.sh
+          sh tests/test_public_check.sh
+          sh tests/test_workflows.sh
+          python3 -m unittest tests.test_upstream_update
+          python3 -m unittest tests.test_update_propose
+  build:
+    needs: fast
+    if: "${{ gitea.event_name == 'pull_request' || (gitea.event_name == 'push' && (gitea.ref == 'refs/heads/local-dev' || startsWith(gitea.ref, 'refs/heads/sync/'))) }}"
+    runs-on: kit-amd64
+    timeout-minutes: 60
+    steps:
+      - name: 'Full checkout'
+        uses: https://github.com/actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          github-server-url: '${{ gitea.server_url }}'
+          repository: '${{ gitea.repository }}'
+          ref: '${{ gitea.sha }}'
+      - name: 'Upstream build baseline'
+        run: |
+          sh scripts/setup-remotes.sh
+          sh scripts/fetch-upstream.sh "$(awk -F '\t' '$1 == "tag" { print $2 }' scripts/upstream-base)"
+      - name: 'Scanner image'
+        run: |
+          docker pull "$(sed -n 's/^GITLEAKS_IMAGE=${GITLEAKS_IMAGE:-\(.*\)}$/\1/p' scripts/scan.sh)"
+      - name: 'Scanner controls'
+        run: |
+          sh tests/test_scan.sh
+      - name: 'Image and runtime tests'
+        run: |
+          set -eu
+          image="openviking-ci:${CI_RUN}-${CI_ATTEMPT}"
+          trap 'docker image rm "$image" >/dev/null 2>&1 || true' EXIT
+          sh scripts/build.sh test
+          GATEWAY_IMAGE="$image" sh scripts/build.sh gateway
+          TEST_NAME_PREFIX="openviking-ci-image-${CI_RUN}-${CI_ATTEMPT}" sh tests/test_image.sh "$image"
+          OPENVIKING_IMAGE="$image" COMPOSE_TEST_PROJECT="openviking-ci-${CI_RUN}-${CI_ATTEMPT}" sh tests/test_compose.sh
+          base=$(awk -F= '/^ARG PYTHON_IMAGE=/ { image=$2 } /^ARG PYTHON_DIGEST=/ { digest=$2 } END { print image "@" digest }' Dockerfile)
+          sh scripts/scan.sh --level fail image "$image" "$base"
+      - name: 'Node for extension tests'
+        uses: https://github.com/actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: 'Pi extension tests'
+        run: |
+          set -eu
+          test "$(node -p 'Number(process.versions.node.split(".")[0]) >= 24')" = true
+          npm ci --prefix examples/pi-coding-agent-extension --ignore-scripts
+          node examples/memory-plugin-shared/sync.mjs
+          node --test examples/pi-coding-agent-extension/tests/*.test.mjs
+          node --test examples/memory-plugin-shared/*.test.mjs

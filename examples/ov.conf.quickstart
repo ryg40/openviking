@@ -1,0 +1,19 @@
+{
+  "server": {"host": "0.0.0.0", "port": 1933, "root_api_key": "REPLACE_WITH_OPENVIKING_ROOT_API_KEY"},
+  "storage": {"workspace": "/app/.openviking/data"},
+  "embedding": {
+    "dense": {
+      "provider": "openai",
+      "api_key": "placeholder",
+      "api_base": "http://127.0.0.1:9/v1",
+      "model": "placeholder-embedding",
+      "dimension": 1024
+    }
+  },
+  "vlm": {
+    "provider": "openai",
+    "api_key": "placeholder",
+    "api_base": "http://127.0.0.1:9/v1",
+    "model": "placeholder-vlm"
+  }
+}

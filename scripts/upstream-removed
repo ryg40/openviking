@@ -1,0 +1,10 @@
+# Upstream paths that this copy deliberately removes after each sync.
+# A trailing slash matches every file below that directory.
+# Other entries match one exact path. No wildcards or parent paths.
+.github/workflows/
+.github/ISSUE_TEMPLATE/
+.github/PULL_REQUEST_TEMPLATE.md
+.github/dependabot.yml
+docker-compose.yml
+tests/misc/test_docker_workflow_native_multiarch.py
+.github/scripts/generate-channels-json.sh

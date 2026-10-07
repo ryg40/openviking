@@ -1,0 +1,56 @@
+# Inactive GitHub Actions mockup. Read deploy.workflow.md.
+name: Example OpenViking deployment
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: Approved ECR image digest from the signed release record
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: openviking-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Require approval and restrict branches on this GitHub environment.
+    environment: openviking-production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Stop until enterprise integrations pass review
+        run: |
+          echo 'Inactive example. Backup, rollback, and host integration are not installed.'
+          exit 1
+      - uses: actions/checkout@REPLACE_WITH_REVIEWED_COMMIT_SHA
+        with:
+          persist-credentials: false
+      - name: Validate input before passing it to a command
+        env:
+          RELEASE_DIGEST: ${{ inputs.digest }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', os.environ['RELEASE_DIGEST'])
+          PY
+      - name: Exchange GitHub OIDC identity for the deployment role
+        uses: aws-actions/configure-aws-credentials@REPLACE_WITH_REVIEWED_COMMIT_SHA
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: openviking-production
+      - name: Run the approved host transaction
+        env:
+          RELEASE_DIGEST: ${{ inputs.digest }}
+        run: |
+          # This enterprise integration is a required prerequisite, not supplied code.
+          # It must verify provenance, pause writes, and verify a consistent backup.
+          # It then deploys by digest and runs authenticated acceptance tests.
+          # On failure, it must restore compatible state and the previous digest.
+          test -x ./enterprise/deploy-openviking-transaction
+          ./enterprise/deploy-openviking-transaction --digest "$RELEASE_DIGEST"
+# The deployment role can invoke only an approved SSM document on tagged hosts.
+# It cannot submit arbitrary shell commands or read application secret values.
