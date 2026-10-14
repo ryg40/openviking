@@ -17,7 +17,7 @@
 #       path). The scan uses these lines only when the base commit is not in
 #       the repository (a shallow clone). No rule of .local/host-values.deny
 #       goes into this file.
-tag	v0.4.23	df32bf6e50a40843438f9491a26069ca4bd08f1f
+tag	v0.5.0	20f9c11362ad16193b0daa4a414e1095061af427
 # Upstream demo evidence of the Pi context-management example: a zip of
 # 74 text files (JSON, logs, Markdown, scripts); tree mode reads it: no finding.
 archive	7110648c99e89cf8e35d9ae5a5f50cdc887b23f9	examples/pi-experimental-context-management/demo-evidence/pi-ctxwin-demo.zip
@@ -37,10 +37,12 @@ hit	68d67d95a2f809aab86b472a24cdc17aa5c65a85	tests/server/test_auth.py
 hit	78e3b90a12ac7ddea5c6a1f4f8b50e604ae8d07b	docs/zh/guides/11-grafana-prometheus.md
 hit	795458228c416123901fb5c24178f109c4934a79	tests/unit/test_ollama_utils.py
 hit	7b094e805a3eae8683ebc40594be761873dea524	tests/vectordb/test_opengauss_adapter_complete.py
+hit	8bd846eac2a65da9226c5269ec8cc0254d88e5ed	web-studio/src/routes/gateway/-lib/format.test.ts
 hit	8d4a964af77d29f89f4456df861be21a0f7e00e2	tests/misc/test_network_guard.py
 hit	92d7461dc48a2b4cff9a311ddd77b785b8ae739d	docs/zh/guides/13-multi-write-storage.md
 hit	97d9f210a967ba60ae3ad73c3aace91cfe5a49ad	examples/openclaw-plugin/skills/install-openviking-memory/SKILL.md
 hit	a76e3fe47be26815a0e2de80b8e7af85729d3327	tests/misc/test_network_guard.py
+hit	ac049fc678f08081abc13fe93ffba1e612900f44	web-studio/src/routes/gateway/-lib/format.test.ts
 hit	bad23d24aef5f87217b3a51a111132cffe4b7a44	tests/vectordb/test_opengauss_adapter_complete.py
 hit	bc3ed94dbf6742148d8520e3c29bf0781af30f2a	tests/server/test_auth.py
 hit	c1a0f03cda879c7cfa5a564b3a3a249335ec4c55	examples/openclaw-plugin/skills/install-openviking-memory/SKILL.md
@@ -48,4 +50,5 @@ hit	c7375ad6189e9aff58e54201612e2a5a46166147	examples/openclaw-plugin/tests/e2e/
 hit	e2eb3e334cbd9d253b1910e39e7af620e11ac5f0	examples/openclaw-plugin/tests/e2e/test-archive-expand.py
 hit	ec8b306b544d2a37a380a24e9893784188c53a42	tests/misc/test_network_guard.py
 hit	f3a9bd623a493f1436a9525711a371ca9c3fc88a	tests/unit/test_ollama_utils.py
+hit	f623524c09b5c4e189fe7a9c54533fc22e14f927	web-studio/src/routes/gateway/-lib/upstream-schema.test.ts
 hit	fbafa054bf67ad22198ab8ea24bdad005fa662f9	examples/openclaw-plugin/docs/openviking-openclaw-plugin-guide.md

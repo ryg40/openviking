@@ -44,13 +44,13 @@ variable "NODE_IMAGE" {
   default = "node:24-trixie-slim"
 }
 variable "NODE_DIGEST" {
-  default = "sha256:8ec5d7557396cfe32d21c3f9c13072355ceab22b584578ca4bb28af31120cffe"
+  default = "sha256:173f125896c3b47ddf056734c7ea789d04595a6a08769a8f78e0df642781fb66"
 }
 variable "PYTHON_IMAGE" {
   default = "python:3.13-slim-trixie"
 }
 variable "PYTHON_DIGEST" {
-  default = "sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c"
+  default = "sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f"
 }
 
 # PEP 440 version for the Python package and the ov CLI (scripts/build.sh).

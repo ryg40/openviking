@@ -213,13 +213,20 @@ SCANNER_PULL = 'docker pull "$(sed -n \'s/^GITLEAKS_IMAGE=${GITLEAKS_IMAGE:-\\(.
 UPSTREAM_FETCH = 'sh scripts/fetch-upstream.sh "$(awk -F \'\\t\' \'$1 == "tag" { print $2 }\' scripts/upstream-base)"'
 BASE_LOOKUP = 'base=$(awk -F= \'/^ARG PYTHON_IMAGE=/ { image=$2 } /^ARG PYTHON_DIGEST=/ { digest=$2 } END { print image "@" digest }\' Dockerfile)'
 SHELL_TESTS = ["test_setup_remotes.sh", "test_promotion.sh", "test_build_version.sh", "test_public_check.sh", "test_workflows.sh"]
+IMAGE_TRAP = 'trap \'docker image rm "$image" >/dev/null 2>&1 || true\' EXIT'
+# Each build job loads the base image into the Docker image store for the layer scan.
+BASE_SETUP = ['base_image="${image}-base"', 'base_context=$(mktemp -d)',
+              'trap \'docker image rm "$image" "$base_image" >/dev/null 2>&1 || true; rm -rf "$base_context"\' EXIT']
+BASE_LOAD = ['printf \'FROM %s\\n\' "$base" > "$base_context/Dockerfile"',
+             'docker buildx build --load -t "$base_image" "$base_context"']
 FIXED_LINES = {
     'set -eu',
     'test "$(git rev-parse --is-shallow-repository)" = false',
     'image="openviking-ci:${CI_RUN}-${CI_ATTEMPT}"',
-    'trap \'docker image rm "$image" >/dev/null 2>&1 || true\' EXIT',
     'test "$(node -p \'Number(process.versions.node.split(".")[0]) >= 24\')" = true',
     BASE_LOOKUP,
+    *BASE_SETUP,
+    *BASE_LOAD,
 }
 
 
@@ -261,7 +268,7 @@ def commands(script):
                 "scripts/public-check.sh": [()],
                 "scripts/scan.sh": [("tree",), ("history",), ("--level", "fail", "tree"),
                                     ("--level", "fail", "history", "HEAD"),
-                                    ("--level", "fail", "image", "$image", "$base")],
+                                    ("--level", "fail", "image", "$image", "$base_image")],
                 "scripts/build.sh": [("test",), ("gateway",)],
                 "tests/test_image.sh": [("$image",)],
                 "tests/test_compose.sh": [()],
@@ -361,11 +368,11 @@ def validate(path, workflow):
             expected = [] if public else ["sh scripts/setup-remotes.sh", UPSTREAM_FETCH]
             expected += [SCANNER_PULL, "sh tests/test_scan.sh", 'set -eu',
                          'image="openviking-ci:${CI_RUN}-${CI_ATTEMPT}"',
-                         'trap \'docker image rm "$image" >/dev/null 2>&1 || true\' EXIT',
+                         *BASE_SETUP,
                          "sh scripts/build.sh test", 'GATEWAY_IMAGE="$image" sh scripts/build.sh gateway',
                          'TEST_NAME_PREFIX="openviking-ci-image-${CI_RUN}-${CI_ATTEMPT}" sh tests/test_image.sh "$image"',
                          'OPENVIKING_IMAGE="$image" COMPOSE_TEST_PROJECT="openviking-ci-${CI_RUN}-${CI_ATTEMPT}" sh tests/test_compose.sh',
-                         BASE_LOOKUP, 'sh scripts/scan.sh --level fail image "$image" "$base"',
+                         BASE_LOOKUP, *BASE_LOAD, 'sh scripts/scan.sh --level fail image "$image" "$base_image"',
                          'set -eu', 'test "$(node -p \'Number(process.versions.node.split(".")[0]) >= 24\')" = true',
                          'npm ci --prefix examples/pi-coding-agent-extension --ignore-scripts',
                          'node examples/memory-plugin-shared/sync.mjs',
@@ -526,6 +533,30 @@ for name, callback in [
     ("development path filter", lambda w: w["on"]["push"].update(paths=["Dockerfile"])),
 ]:
     check("control: " + name, lambda c=callback: changed(c, development_path), bad=True)
+
+
+def image_step(workflow):
+    step = workflow["jobs"]["build"]["steps"][-3]
+    require(step["name"] == "Image and runtime tests", "image step moved")
+    return step
+
+
+for path in (development_path, public_path):
+    label = "development" if path == development_path else "public"
+    for name, edit in [
+        ("base image not loaded", lambda run: run.replace(BASE_LOAD[1] + "\n", "")),
+        ("layer scan against the unloaded base", lambda run: run.replace('"$image" "$base_image"\n', '"$image" "$base"\n')),
+        ("base image tag not removed", lambda run: run.replace(BASE_SETUP[2], IMAGE_TRAP)),
+        ("base image loaded after the scan", lambda run: run.replace(BASE_LOAD[1] + "\n", "") + BASE_LOAD[1] + "\n"),
+    ]:
+        def callback(workflow, edit=edit):
+            step = image_step(workflow)
+            run = edit(step["run"])
+            # An edit that changes nothing proves nothing; fail the control.
+            if run == step["run"]:
+                raise SystemExit("control edit did not change the step")
+            step.update(run=run)
+        check("control: " + label + " " + name, lambda c=callback, p=path: changed(c, p), bad=True)
 
 
 controls = [

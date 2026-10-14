@@ -8,10 +8,10 @@ ARG RUST_IMAGE=rust:1.91.1-trixie
 ARG RUST_DIGEST=sha256:867f1d1162913c401378a8504fb17fe2032c760dc316448766f150a130204aad
 # node:24-trixie-slim
 ARG NODE_IMAGE=node:24-trixie-slim
-ARG NODE_DIGEST=sha256:8ec5d7557396cfe32d21c3f9c13072355ceab22b584578ca4bb28af31120cffe
+ARG NODE_DIGEST=sha256:173f125896c3b47ddf056734c7ea789d04595a6a08769a8f78e0df642781fb66
 # python:3.13-slim-trixie (Python build stage and runtime)
 ARG PYTHON_IMAGE=python:3.13-slim-trixie
-ARG PYTHON_DIGEST=sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c
+ARG PYTHON_DIGEST=sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
 
 # Stage 1: provide Rust toolchain (required by setup.py -> build_ov_cli_artifact -> cargo build)
 # ragfs-python's default S3-enabled dependency set currently requires rustc >= 1.91.1.
@@ -36,7 +36,7 @@ ARG PIP_INDEX_URL
 ARG UV_DEFAULT_INDEX
 
 # uv from PyPI, pinned by hash, in place of the ghcr.io/astral-sh/uv image.
-RUN printf '%s\n' 'uv==0.12.23 --hash=sha256:11d18c1589d7907376b4f3fa31028e46cc609ac4b7d83eabc2b04cd8ca1433cc --hash=sha256:565c6e2874dbeae86c02f3dea97255e878fec672659a73d4930c6b93fcab2fff --hash=sha256:895137194d242cc8075c3006288b485af54feeae68512f4ffc96f75b27543cc0 --hash=sha256:9346c741175c7fc0d380f30fcfcb8d5e13f5f900b30536230c8d34208524e47a' > /tmp/uv-requirements.txt \
+RUN printf '%s\n' 'uv==0.13.0 --hash=sha256:5163a516b9a488bccb4001f727720b775719dfb6dcb144a9bc0ef23e5cfdd269 --hash=sha256:52c7da0fd9056d9551124777ec77de53f0df7017daf8f98a19e947b7837416ed --hash=sha256:5cb956988442f5b1ca281344818a6b9fa296a799d7024cc53ae571d464150ca2 --hash=sha256:f840e640fe16591f6d71a94e8863707b7ba43c5786d1fe662868a9fb44c53e50' > /tmp/uv-requirements.txt \
  && python -m pip install --no-cache-dir --root-user-action=ignore --only-binary=:all: --require-hashes -r /tmp/uv-requirements.txt \
  && rm /tmp/uv-requirements.txt
 
@@ -80,6 +80,7 @@ COPY crates/ crates/
 COPY openviking/ openviking/
 COPY --from=web-studio-builder /app/web-studio/dist/ openviking/web_studio/dist/
 COPY openviking_cli/ openviking_cli/
+COPY openviking_gateway/ openviking_gateway/
 COPY src/ src/
 COPY third_party/ third_party/
 
@@ -103,13 +104,13 @@ RUN --mount=type=cache,target=/root/.cache/uv,id=uv-${TARGETPLATFORM} \
     fi; \
     case "${UV_LOCK_STRATEGY}" in \
         locked) \
-            uv sync --locked --no-editable --reinstall-package openviking --extra bot --extra gemini --extra opengauss \
+            uv sync --locked --no-editable --reinstall-package openviking --extra bot --extra gemini --extra opengauss --extra gateway \
             ;; \
         auto) \
             if ! uv lock --check; then \
                 uv lock; \
             fi; \
-            uv sync --locked --no-editable --reinstall-package openviking --extra bot --extra gemini --extra opengauss \
+            uv sync --locked --no-editable --reinstall-package openviking --extra bot --extra gemini --extra opengauss --extra gateway \
             ;; \
         *) \
             echo "Unsupported UV_LOCK_STRATEGY: ${UV_LOCK_STRATEGY}" >&2; \

@@ -71,7 +71,11 @@ Buildah supports `RUN --mount=type=cache` with `id` since v1.24.0.
 Its builder sets `TARGETPLATFORM` automatically; the `ARG TARGETPLATFORM` lines expose it within each stage.
 The release announcement, mount documentation and vendored builder source are in the [Mac Sources table](mac.md#sources).
 
-Not verified: a Podman build of this image.
+Verified on Linux `amd64` with Podman 5.8.7 and Buildah 1.43.4, run as root: `gateway` and `smoke` pass.
+In the same run, `test` and `release` refuse this engine with exit code 1.
+Buildah writes the OCI image format. That format has no `HEALTHCHECK`, so Buildah drops the instruction with a warning.
+`compose.yaml` defines its own health check.
+Not verified: a Podman build for `linux/arm64`, a build with Podman as a normal user (rootless) and a build on a Mac.
 [Mac instructions](mac.md) describe the VM, Compose provider and unchanged Docker CLI tests.
 
 ### Variables
@@ -207,7 +211,7 @@ No stage, `COPY`, cache mount or command of upstream changed.
 `.dockerignore` excludes everything, then permits the `COPY` sources:
 `Cargo.toml`, `Cargo.lock`, `pyproject.toml`, `uv.lock`, `setup.py`,
 `README.md`, `scripts/build_support/`, `bot/`, `crates/`, `openviking/`,
-`openviking_cli/`, `src/`, `third_party/`, `web-studio/`, and the two files in
+`openviking_cli/`, `openviking_gateway/`, `src/`, `third_party/`, `web-studio/`, and the two files in
 `deploy/docker/`. Inside these, local artifacts (`.env*`, `.venv`,
 `__pycache__`, `node_modules`, `target/`, build output, logs) are excluded at
 any depth. `data/`, `.env`, `.local/`, `.git/`, `examples/`, `docs/`,
@@ -240,6 +244,14 @@ context mount), so it is an open point.
 A private CA certificate for a proxy or a mirror is not supported yet. The
 way to add it is a BuildKit secret (`RUN --mount=type=secret,id=ca`) in each
 stage that downloads. That changes upstream `RUN` lines. Open point.
+
+## OpenViking Gateway
+
+Upstream adds OpenViking Gateway, a model proxy that adds memory without a client plugin.
+Its separate process, `openviking-gateway`, uses port `1935` by default and requires the `gateway` configuration section and two secret variables.
+The image includes its dependencies, but the kit's `compose.yaml` does not start it yet.
+The bake target `gateway` still builds the server image; it does not start OpenViking Gateway or the VikingBot gateway.
+See the [upstream OpenViking Gateway operations](en/guides/22-gateway-operations.md) for its requirements.
 
 ## Runtime content
 

@@ -88,6 +88,8 @@ Each listed helper must be tracked with its exact mode and blob hash.
 No other GitHub path is accepted.
 The current tree retains ten helpers used by the upstream plugin tests and their helper calls.
 The channel generator is deleted because its only caller is a deleted upstream release workflow.
+The host-compatibility helper and its JSON configuration are deleted because no retained executable file calls them.
+The download builder and archive checker stay because the shared plugin tests call both helpers.
 
 The deletion list has one repository-relative path per line.
 The reader strips surrounding whitespace and ignores blank lines and lines that start with `#`.

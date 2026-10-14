@@ -2,8 +2,8 @@
 
 <a href="https://openviking.ai/" target="_blank">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/volcengine/OpenViking/f5b6043d29406ec8102402868745bdc879e48f90/docs/images/readme-logo-dark.png">
-    <img alt="OpenViking" src="https://raw.githubusercontent.com/volcengine/OpenViking/f5b6043d29406ec8102402868745bdc879e48f90/docs/images/readme-logo-light.png" width="300" height="56">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/volcengine/OpenViking/main/docs/images/readme-logo-dark.png">
+    <img alt="OpenViking" src="https://raw.githubusercontent.com/volcengine/OpenViking/main/docs/images/readme-logo-light.png" width="300" height="56">
   </picture>
 </a>
 
@@ -86,7 +86,10 @@ The last word of the scan summary is `fail` on `portable` or a `portable-v*` tag
 On `portable`, `scripts/build.sh` reads the upstream version from `scripts/upstream-base` ([image build](docs/image.md)).
 The image label `org.opencontainers.image.source` names upstream unless `SOURCE_URL` is set: `SOURCE_URL=<url of the repo> sh scripts/build.sh gateway` makes the label name your repository.
 
-Warning: `docker compose up` in a checkout that holds live `data/` replaces the live container. Test in a separate copy ([operations](docs/operations.md)).
+Warning: `docker compose up` in a checkout that holds live `data/` replaces the live container.
+
+Use a new clone with its own Compose project name (`COMPOSE_PROJECT_NAME=<name>`), image tag (`OPENVIKING_IMAGE`) and free port (`OPENVIKING_PORT`).
+Alternatively, `OPENVIKING_IMAGE=<test-image> sh tests/test_compose.sh` isolates the project, port and state directory ([operations](docs/operations.md)).
 
 Branches ([branches](docs/branches.md)):
 
@@ -99,7 +102,7 @@ Branches ([branches](docs/branches.md)):
 The checks workflows call the existing scripts; no workflow publishes an image or makes a release.
 The [development update workflow](docs/ci.md#development-update-workflow) detects updates daily and proposes at most one unhandled candidate per run.
 
-Documents: [operations](docs/operations.md), [image build](docs/image.md), [updates](docs/update.md), [testing](docs/testing.md), [secret handling](docs/secret-handling.md), [public check](docs/public-check.md), [remotes](docs/remotes.md), [Mac](docs/mac.md), [CI](docs/ci.md), [issue tracker](docs/agents/issue-tracker.md).
+Documents: [architecture explorer](docs/architecture.md), [operations](docs/operations.md), [image build](docs/image.md), [updates](docs/update.md), [testing](docs/testing.md), [secret handling](docs/secret-handling.md), [public check](docs/public-check.md), [remotes](docs/remotes.md), [Mac](docs/mac.md), [CI](docs/ci.md), [issue tracker](docs/agents/issue-tracker.md).
 The [AWS examples](examples/aws/README.md) are inactive; they deploy nothing.
 
 ## What is OpenViking

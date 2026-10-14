@@ -571,11 +571,13 @@ expect_status "upstream-base: a repository without HEAD: staged runs" 0 in_repo 
 g init -q --bare "$work/up-remote.git"
 g -C "$up" remote add origin "$work/up-remote.git"
 in_repo "$up" sh scripts/install-hooks.sh >/dev/null
-expect_status "upstream pre-push: a new branch with an upstream token in its history is accepted" 0 \
-    g -C "$up" push -q origin main
+# First, while the remote is empty: a portable ref skips the commits that the
+# remote has, and after the next push the remote has main.
 expect_status "upstream pre-push: a new portable branch is scanned in all of its history" 1 \
     g -C "$up" push -q origin main:portable
 expect_out "upstream pre-push: the upstream token refuses the portable push" "old-token.txt:1  rule github-pat"
+expect_status "upstream pre-push: a new branch with an upstream token in its history is accepted" 0 \
+    g -C "$up" push -q origin main
 
 echo "# hooks in a temporary clone"
 g init -q --bare "$work/remote.git"
@@ -612,8 +614,9 @@ g -C "$c" checkout -q -b clean "$before"
 printf 'api_base: http://%s\n' "$host_ip" >"$c/host.yaml"
 g -C "$c" add host.yaml
 expect_status "pre-commit: a host value on another branch is a warning" 0 g -C "$c" commit -q -m host
-expect_status "pre-push: a host value to branch main is a warning" 0 g -C "$c" push -q origin clean:main
+# First portable: a portable ref skips the commits that the remote has on main.
 expect_status "pre-push: a host value to branch portable is refused" 1 g -C "$c" push -q origin clean:portable
+expect_status "pre-push: a host value to branch main is a warning" 0 g -C "$c" push -q origin clean:main
 printf 'name: %s\n' "$host_name" >"$c/name.txt"
 g -C "$c" add name.txt
 expect_status "pre-commit: a local pattern on another branch is a warning" 0 g -C "$c" commit -q -m name
@@ -687,6 +690,44 @@ g -C "$work/clone-wt" add leak.txt
 expect_status "pre-commit in a worktree: a commit with a token is refused" 1 g -C "$work/clone-wt" commit -q -m leak
 g -C "$work/clone-wt" commit -q --no-verify -m leak
 expect_status "pre-push in a worktree: a push with a token is refused" 1 g -C "$work/clone-wt" push -q origin wtbranch
+
+echo "# pre-push: a portable ref scans the commits that the remote does not have"
+# Snapshot 1 of a portable chain has a host value that the upstream base does
+# not accept, and the remote pub has it. Snapshot 2 is clean, with a new tag.
+s1_blob=$(printf 'api_base: http://%s\n' "$host_ip" | g -C "$c" hash-object -w --stdin)
+s1_tree=$(printf '100644 blob %s\tnet.md\n' "$s1_blob" | g -C "$c" mktree)
+s1=$(g -C "$c" commit-tree -m "snapshot 1" "$s1_tree")
+s2_blob=$(printf 'api_base: http://example.invalid\n' | g -C "$c" hash-object -w --stdin)
+s2_tree=$(printf '100644 blob %s\tnet.md\n' "$s2_blob" | g -C "$c" mktree)
+s2=$(g -C "$c" commit-tree -p "$s1" -m "snapshot 2" "$s2_tree")
+g -C "$c" tag -a -m "snapshot 2" portable-v0.2.0 "$s2"
+s2_tag=$(g -C "$c" rev-parse portable-v0.2.0)
+g init -q --bare "$work/pub.git"
+g -C "$c" remote add pub "$work/pub.git"
+g -C "$c" push -q --no-verify pub "$s1:refs/heads/portable"
+g -C "$c" fetch -q pub
+expect_status "portable range: the new tag alone to the remote name is accepted" 0 \
+    g -C "$c" push -q --dry-run pub portable-v0.2.0
+expect_out "portable range: the remote-tracking ref leaves one commit" "scan: history $s2_tag --not --remotes=pub: 1 commit(s)"
+expect_status "portable range: the branch and the new tag to the URL are accepted" 0 \
+    g -C "$c" push -q --dry-run "$work/pub.git" "$s2:refs/heads/portable" portable-v0.2.0
+expect_out "portable range: the branch scans one commit" "scan: history $s1..$s2: 1 commit(s)"
+expect_out "portable range: the remote branch of the push leaves one commit for the tag" \
+    "scan: history $s2_tag --not $s1: 1 commit(s)"
+g init -q --bare "$work/pub-empty.git"
+expect_status "portable range: the same push to an empty remote is refused" 1 \
+    g -C "$c" push -q --dry-run "$work/pub-empty.git" "$s2:refs/heads/portable" portable-v0.2.0
+expect_out "portable range: the empty remote gets the whole chain" "scan: history $s2_tag: 2 commit(s)"
+expect_out "portable range: the finding is in snapshot 1" "FAIL  host value  net.md:1  rule host-value-private-192"
+expect_out "portable range: the finding names snapshot 1" "commit $(printf '%.12s' "$s1")"
+# A URL is not a remote name: the tag alone gets the whole chain, and the
+# printed range holds no part of the URL (no network: the hook is run directly).
+# shellcheck disable=SC2016 # the inner sh expands $1 and $2
+expect_status "portable range: the new tag alone to a URL is refused" 1 in_repo "$c" sh -c '
+    printf "refs/tags/portable-v0.2.0 %s refs/tags/portable-v0.2.0 %040d\n" "$1" 0 |
+        sh scripts/git-hooks/pre-push "$2" "$2"' sh "$s2_tag" "https://bot:$sec@git.example.invalid/o/r.git"
+expect_out "portable range: URL: the whole chain" "scan: history $s2_tag: 2 commit(s)"
+expect_no_out "portable range: URL: the credential is not printed" "$sec"
 
 echo "# hooks fail closed, pre-merge-commit, a branch without the scan"
 g -C "$c" checkout -q -f clean

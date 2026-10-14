@@ -8,3 +8,6 @@
 docker-compose.yml
 tests/misc/test_docker_workflow_native_multiarch.py
 .github/scripts/generate-channels-json.sh
+.github/scripts/host-compat.mjs
+.github/host-compat.json
+Caddyfile

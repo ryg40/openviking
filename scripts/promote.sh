@@ -135,6 +135,7 @@ if [ -n "$remote" ]; then
     mirror=$(git config --get "remote.$remote.mirror" 2>/dev/null || true)
     case $mirror in ''|false) ;; *) refuse 'mirror remote' ;; esac
     git ls-remote "$remote" >"$work/before" 2>"$work/network-error" || refuse 'cannot read target remote'
+    remote_old=$(awk '$2 == "refs/heads/portable" { print $1 }' "$work/before")
     if [ "$root" -eq 1 ] && grep -Eq '[[:space:]]refs/(heads/portable$|tags/portable-v)' "$work/before"; then
         refuse 'root requires a target without portable or portable release tags'
     fi
@@ -178,9 +179,20 @@ if [ -n "$tag" ] && [ -z "$version" ]; then
             }
         ' "$work/before" || refuse 'a root tag cannot replace a different published portable chain'
     fi
+    # Published snapshots are frozen. Scan only the commits that the remote
+    # does not have; a first push scans the whole chain.
+    if [ -z "$remote_old" ]; then
+        range=$new
+        echo 'promote: history scan of the whole chain (first push)'
+    elif git merge-base --is-ancestor "$remote_old" "$new" 2>/dev/null; then
+        range=$remote_old..$new
+        printf 'promote: history scan range %s\n' "$range"
+    else
+        refuse 'remote portable is not an ancestor of the release tag; the chain diverged and a force push is not supported'
+    fi
     SCAN_REF=refs/heads/portable SCAN_EXCLUDE_UPSTREAM=0
     export SCAN_REF SCAN_EXCLUDE_UPSTREAM
-    run_check scripts/scan.sh --level fail history "$new"
+    run_check scripts/scan.sh --level fail history "$range"
 elif [ -n "$version" ]; then
     # The source can differ from HEAD in a topic checkout. Check its exact tree.
     run_check scripts/public-check.sh --ref "$rev"
@@ -222,7 +234,6 @@ else
 fi
 
 if [ -n "$remote" ]; then
-    remote_old=$(awk '$2 == "refs/heads/portable" { print $1 }' "$work/before")
     printf 'promote: push plan\nremote: %s\nURL: %s\nold remote portable: %s\nnew portable: %s\n' "$remote" "$url" "${remote_old:-absent}" "$new"
     printf 'ref: %s:refs/heads/portable\nref: %s:refs/tags/%s\n' "$new" "$tag_object" "$tag"
     if [ "$development" -eq 1 ]; then echo 'audit mode: development'; else echo 'audit mode: release'; fi

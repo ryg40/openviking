@@ -15,6 +15,7 @@
 !crates/
 !openviking/
 !openviking_cli/
+!openviking_gateway/
 !src/
 !third_party/
 !web-studio/

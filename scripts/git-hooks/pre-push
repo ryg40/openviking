@@ -10,8 +10,11 @@
 # A secret or a policy finding refuses the push. A host value refuses a push to the branch
 # portable or to a tag portable-v*; for other refs it prints a warning.
 # The commits of the upstream base (scripts/upstream-base) are not scanned,
-# except for the branch portable and a tag portable-v*: these are scanned in
-# all of their history.
+# except for the branch portable and a tag portable-v*. A portable ref is
+# scanned in all of its history that the remote does not have yet, upstream
+# commits included. The remote commits of the other refs of the push and the
+# remote-tracking refs of a remote name show what the remote has. The first
+# push of a chain scans all of it.
 
 set -eu
 
@@ -56,6 +59,22 @@ if [ ! -f "$scan" ]; then
     exit 0
 fi
 
+# What the remote has, for a new portable ref: the remote commits of this push
+# that exist here, and the remote-tracking refs of a remote name. A URL has no
+# remote-tracking refs; it is not put in the range, which scan.sh prints.
+known=
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case $remote_sha in *[!0]*) ;; *) continue ;; esac
+    if git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+        known="$known $remote_sha"
+    fi
+done <<EOF
+$refs
+EOF
+if git remote | grep -qxF -- "$remote"; then
+    known="$known --remotes=$remote"
+fi
+
 status=0
 while read -r local_ref local_sha remote_ref remote_sha; do
     case $local_sha in *[!0]*) ;; *) continue ;; esac # a delete sends no commit
@@ -68,8 +87,13 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     if case $remote_sha in *[!0]*) false ;; *) true ;; esac ||
         ! git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
         case $remote_ref in
-            # A new portable ref must be clean in all of its history.
-            refs/heads/portable|refs/tags/portable-v*) range=$local_sha ;;
+            # A new portable ref: the commits that the remote does not have yet.
+            # The remote commit of this line is zero or not here, so $known
+            # holds only the other lines. With nothing known, the whole chain.
+            refs/heads/portable|refs/tags/portable-v*)
+                range=$local_sha
+                [ -z "$known" ] || range="$local_sha --not$known"
+                ;;
             # A new ref, or the remote commit is not here: the commits that no
             # remote-tracking ref of this remote contains.
             *) range="$local_sha --not --remotes=$remote" ;;

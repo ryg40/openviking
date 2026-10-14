@@ -84,13 +84,17 @@ jobs:
         run: |
           set -eu
           image="openviking-ci:${CI_RUN}-${CI_ATTEMPT}"
-          trap 'docker image rm "$image" >/dev/null 2>&1 || true' EXIT
+          base_image="${image}-base"
+          base_context=$(mktemp -d)
+          trap 'docker image rm "$image" "$base_image" >/dev/null 2>&1 || true; rm -rf "$base_context"' EXIT
           sh scripts/build.sh test
           GATEWAY_IMAGE="$image" sh scripts/build.sh gateway
           TEST_NAME_PREFIX="openviking-ci-image-${CI_RUN}-${CI_ATTEMPT}" sh tests/test_image.sh "$image"
           OPENVIKING_IMAGE="$image" COMPOSE_TEST_PROJECT="openviking-ci-${CI_RUN}-${CI_ATTEMPT}" sh tests/test_compose.sh
           base=$(awk -F= '/^ARG PYTHON_IMAGE=/ { image=$2 } /^ARG PYTHON_DIGEST=/ { digest=$2 } END { print image "@" digest }' Dockerfile)
-          sh scripts/scan.sh --level fail image "$image" "$base"
+          printf 'FROM %s\n' "$base" > "$base_context/Dockerfile"
+          docker buildx build --load -t "$base_image" "$base_context"
+          sh scripts/scan.sh --level fail image "$image" "$base_image"
       - name: 'Node for extension tests'
         uses: https://github.com/actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:

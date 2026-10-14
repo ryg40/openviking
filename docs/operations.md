@@ -4,7 +4,8 @@ This document tells how to start, check and run the OpenViking stack of
 `compose.yaml`: start, logs, image selection, backup, upgrade and rollback.
 For the host values, see `docs/host-configuration.md`. For the image build,
 see `docs/image.md`. For the branches and the upstream sync, see
-`docs/branches.md`.
+`docs/branches.md`. For a map of the stack and its parts, see
+`docs/architecture.md`.
 
 ## Start
 

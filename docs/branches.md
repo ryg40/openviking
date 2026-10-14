@@ -70,6 +70,7 @@ Replace `v<X.Y.Z>` with the new release tag, then run the blocks in order in one
    | `.dockerignore` | Allowlist of the `COPY` sources | [image.md](image.md), "Build context" |
    | `.github/dependabot.yml` | Deleted; do not restore during an upstream sync | this repo |
    | `.github/scripts/generate-channels-json.sh` | Deleted; its only caller is the deleted upstream release workflow | [public-check.md](public-check.md), "Rules" |
+   | `.github/scripts/host-compat.mjs`, `.github/host-compat.json` | Deleted; only the removed upstream host-compatibility workflow uses them | [public-check.md](public-check.md), "Rules" |
    | `.github/workflows/` (all upstream files) | Deleted; delete new upstream workflow files after each sync. Keep only workflows written for this repo. | [ci.md](ci.md) |
    | `.github/ISSUE_TEMPLATE/` (all 4 upstream files), `.github/PULL_REQUEST_TEMPLATE.md` | Deleted; do not restore upstream templates during a sync | this repo |
    | `.gitignore` | Private ignore rules: `.local/`, `.env`, `.env.*` (except `.env.example`) and `data/` | [host-configuration.md](host-configuration.md), "Host values and where they live" |
@@ -77,12 +78,15 @@ Replace `v<X.Y.Z>` with the new release tag, then run the blocks in order in one
    | `README.md` | The section "Portable install kit and quick start" | this repo |
    | `SECURITY.md` | The kit section at the end stays; the upstream text above it follows upstream | this repo |
    | `docker-compose.yml` | Deleted; `compose.yaml` replaces it | [host-configuration.md](host-configuration.md) |
+   | `Caddyfile` | Deleted; the kit does not use the upstream proxy or start OpenViking Gateway | [image.md](image.md), "OpenViking Gateway" |
    | `docs/repository/CONTRIBUTING_CN.md` | The kit section at the end stays; the upstream text above it follows upstream | this repo |
    | `docs/repository/CONTRIBUTING_JA.md` | The kit section at the end stays; the upstream text above it follows upstream | this repo |
    | `examples/pi-coding-agent-extension/`: `README.md`, `config.ts`, `index.ts`, `lib/capture-adapter.mjs`, `sync.ts`, `tests/capture-adapter.test.mjs`, `tests/config.test.mjs`, `tests/sync-barrier.test.mjs` | Local fork of the Pi extension: takeover off by default, tool result capture and credential redaction, keyword capture, sync watermark and `ensureSession` | [Pi extension README](../examples/pi-coding-agent-extension/README.md), "Local fork: differences and updating an installed copy" |
-   | `examples/pi-coding-agent-extension/package.json`, `examples/pi-coding-agent-extension/package-lock.json` | The `engines` field requires Node 24 or later | [testing.md](testing.md), "Pi extension tests" |
+   | `examples/pi-coding-agent-extension/package.json`, `examples/pi-coding-agent-extension/package-lock.json` | The `engines` field (the Node.js version requirement of package.json) requires Node 24 or later | [testing.md](testing.md), "Pi extension tests" |
+   | `examples/pi-coding-agent-extension/package.json`, `examples/pi-coding-agent-extension/package-lock.json` | Pin @modelcontextprotocol/client to exact `2.2.0` for [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (an MCP client security advisory); upstream pins `2.0.0` | this repo |
+   | `examples/pi-coding-agent-extension/tests/takeover-session-manager.test.mjs` | Confirm Working Memory in the mock commit response, as the upstream takeover guard requires | [testing.md](testing.md), "Pi extension tests" |
    | `examples/pi-coding-agent-extension/lib/capture-utils-local.mjs` | Local wrapper of shared filters; keep tool-output opt-in, credential redaction and keyword capture | [Pi extension README](../examples/pi-coding-agent-extension/README.md), "Local fork: differences and updating an installed copy" |
-   | `openviking/session/session.py` | Preserve model-error propagation during working-memory creation when upstream moves helpers | [Working-memory regression tests](../tests/unit/session/test_extraction_batch.py), `test_working_memory_propagates_model_errors` |
+   | `openviking/session/session.py` | Model-error propagation now matches upstream; keep the retained regression test when upstream moves helpers | [Working-memory regression tests](../tests/unit/session/test_extraction_batch.py), `test_working_memory_propagates_model_errors` |
    | `tests/misc/test_abi3_packaging_config.py` | Keep workflow tests skipped when their workflow is absent after each sync | this repo |
    | `tests/misc/test_root_docker_image_packaging.py` | Keep workflow tests skipped when their workflow is absent after each sync | this repo |
    | `tests/misc/test_docker_workflow_native_multiarch.py` | Deleted; remove tests that only read deleted workflows after each sync | this repo |
@@ -199,6 +203,8 @@ The command does not ask for approval. It does not grant approval.
 If the objects or remote state change, show a new plan and get approval again.
 The command does not store approval or enforce equality across separate calls.
 The command prints the push plan and runs a push dry run first.
+The history scan of a push covers only the commits that the remote does not have.
+The first push to a remote without `portable` scans the whole chain.
 It sends only the explicit branch ref and the one release tag ref. It never forces a push.
 The refspec sources are the checked object IDs, so a concurrent local ref change cannot substitute another object.
 Use `--version X.Y.Z --push shared` only when both local creation and the push have approval.

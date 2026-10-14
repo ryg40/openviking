@@ -72,7 +72,8 @@ The shell files that `shellcheck` checks: `scripts/build.sh`, `scripts/scan.sh`,
 The install kit requires Node 24 or later on developer machines and CI runners.
 The Pi extension tests import TypeScript files (`*.ts`) with the type stripping of Node, which removes the type annotations.
 On an older Node, these imports fail.
-`nvm use` or a tool that reads the root `.nvmrc` selects Node 24.
+`nvm` is one Node version manager; any Node 24 installation works.
+If you use `nvm`, `nvm use` reads the root `.nvmrc` and selects Node 24.
 
 Run the same version check as the workflows before you prepare the extension:
 

@@ -555,6 +555,22 @@ mutate(
     lambda _: upstream_line.rstrip("\n") + " changed\n",
     "private-tracker",
 )
+# Each deletion note accepts only its exact line, not a changed path.
+for digest in [
+    item["line_blob"] for item in rules["exceptions"]
+    if item["reason"] == "Sync table explicitly records deliberately deleted upstream paths."
+]:
+    line = next(
+        line for line in Path("docs/branches.md").read_text().splitlines(keepends=True)
+        if hashlib.sha1(b"blob " + str(len(line.encode())).encode() + b"\0" + line.encode()).hexdigest() == digest
+    )
+    mutate("exact deletion note", "docs/branches.md", lambda old, line=line: old + "\n" + line, None, 0)
+    mutate(
+        "changed deletion note fails",
+        "docs/branches.md",
+        lambda old, line=line: old.replace(line, line.replace("`Caddyfile`", "`missing/Caddyfile`").replace("`.github/", "`missing/.github/")),
+        "document-code-path",
+    )
 # Exact content exception accepts one line, not the next line or the whole file.
 rules["exceptions"].append(
     {"rule": "private-tracker", "line_blob": sample_blob, "reason": "Synthetic test line."}

@@ -315,7 +315,7 @@ export class SyncManager {
   }
 
   async commit(
-    opts: { queueOnFailure?: boolean; keepRecentCount?: number; timeoutMs?: number } = {},
+    opts: { queueOnFailure?: boolean; keepRecentCount?: number; timeoutMs?: number; enableWorkingMemory?: boolean } = {},
   ): Promise<any | null> {
     if (!this.ovSessionId) {
       this.lastCommitFailure = "no OpenViking session yet";
@@ -325,6 +325,7 @@ export class SyncManager {
       this.ovSessionId,
       opts.keepRecentCount,
       opts.timeoutMs,
+      opts.enableWorkingMemory,
     );
     const result = response.result;
     if (!result) {
@@ -338,7 +339,7 @@ export class SyncManager {
       });
       if (opts.queueOnFailure !== false) {
         await enqueue("commitSession", this.ovSessionId, {
-          keep_recent_count: opts.keepRecentCount ?? this.config.commitKeepRecentCount,
+          keep_recent_count: opts.keepRecentCount ?? 0,
         });
       }
       return null;

@@ -95,7 +95,7 @@ Negative controls (`tests/test_scan.sh`, section "upstream content"): an address
 
 ### Upstream history
 
-`scripts/scan.sh history` without a range scans `^<base commit> HEAD`: the local commits and the merge commits, not the upstream commits. Without the base commit in the repository, it scans `HEAD`. An explicit range is scanned as given, unless `SCAN_EXCLUDE_UPSTREAM=1` is set. The hook `pre-push` sets it for each ref except `portable` and `portable-v*`: a portable ref is scanned in all of its history.
+`scripts/scan.sh history` without a range scans `^<base commit> HEAD`: the local commits and the merge commits, not the upstream commits. Without the base commit in the repository, it scans `HEAD`. An explicit range is scanned as given, unless `SCAN_EXCLUDE_UPSTREAM=1` is set. The hook `pre-push` sets it for each ref except `portable` and `portable-v*`. For a portable ref, the hook scans the commits that the remote does not have, upstream commits included. The first push of a chain scans all of it. The hook knows the remote commits from the other refs of the same push and from the remote-tracking refs of a remote name.
 
 gitleaks shows no diff for a merge commit. Thus the upstream files that a merge brings are not in the history scan; the modes `tree` and `staged` (hook `pre-merge-commit`) scan them.
 
@@ -306,7 +306,7 @@ scripts/install-hooks.sh --uninstall
 | --- | --- |
 | `pre-commit` | `scripts/scan.sh staged`. The level follows the current branch. |
 | `pre-merge-commit` | The same as `pre-commit`. `git merge` runs this hook, not `pre-commit`, when it records a merge commit without a conflict. |
-| `pre-push` | First the guard: a push to a remote other than `origin` and `upstream` (the remote `shared`, another remote, a URL) that sends or deletes a ref other than `refs/heads/portable` or `refs/tags/portable-v*` is refused, with no scan. Then `scripts/scan.sh history` for the commits of each pushed ref, without the upstream commits. The level follows the remote ref. A new `portable` branch or `portable-v*` tag is scanned in all of its history, upstream commits included. |
+| `pre-push` | First the guard: a push to a remote other than `origin` and `upstream` (the remote `shared`, another remote, a URL) that sends or deletes a ref other than `refs/heads/portable` or `refs/tags/portable-v*` is refused, with no scan. Then `scripts/scan.sh history` for the commits of each pushed ref, without the upstream commits. The level follows the remote ref. For a new `portable` branch or `portable-v*` tag, the scan covers the commits that the remote does not have, upstream commits included. The first push of a chain scans all of it. |
 
 After a successful scan, `pre-push` runs `sh scripts/public-check.sh --ref <object ID>` for `portable` and the tags `portable-v*`.
 It checks the pushed object, not the working tree. Other refs keep the scan-only behavior.

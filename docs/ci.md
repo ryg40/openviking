@@ -51,21 +51,38 @@ The pinned actions declare these runtimes in `runs.using` of their action.yml fi
 
 The runner (`act_runner` or the GitHub runner) must execute `node24` actions.
 The Node setup action selects the test runtime; it does not add action-runtime support to the runner.
-Not verified: the oldest act_runner with node24.
+Version 0.2.11 of `act_runner` refuses a job with a `node24` action before its first step.
+Version 0.6.1 of `act_runner` executes the four pinned actions.
+Not verified: the `act_runner` versions between these two.
 
 Allow up to 15 minutes for the fast job and 60 minutes for the build job.
 The update workflow allows 15 minutes for detection and 90 minutes for qualification, notes and publication.
-Estimated qualification time is 25 to 45 minutes per candidate; conflicts stop before builds.
-Estimated fast time is two to five minutes, excluding image download and queue time.
-The scanner controls take about 17 minutes. A cold gateway build takes about nine minutes on a capable host.
-The image tests, Compose tests, lite tests and extension tests add time. Expect a cold build job to take 30 to 45 minutes.
-Not verified: these estimates on a runner.
+Estimated qualification time for an upstream tag is 25 to 45 minutes; conflicts stop before builds.
+These times are from one `amd64` runner with `act_runner` 0.6.1, without queue time:
+
+| Job or stage | Measured time |
+| --- | --- |
+| Detection job | 8 to 14 seconds |
+| Fast job | About five minutes |
+| Qualification job for one base image pin, without extension tests | About 15 to 18 minutes |
+| Qualification job with no unhandled candidate | Less than 10 seconds |
+| Scanner controls | About two minutes |
+| Test image and gateway image builds | Six to nine minutes |
+| Build job from its start to the end of the Compose test | About 10 minutes |
+
+The measured build job reused cached build layers.
+On a development host, the scanner controls took about 17 minutes.
+Not verified: the cause of that difference.
+Not verified: the time of a cold or complete build job, of an upstream tag qualification, and of each job on other hardware.
 
 The Docker daemon must see the checkout and temporary directories at the same absolute paths as the job.
 This includes a Docker-in-Docker setup; the scanner and runtime tests use bind mounts.
 The Compose test runs verification inside the service container, so runners that use the Docker socket do not need the published port.
+A working `act_runner` 0.6.1 setup enables `bind_workdir`, puts the workspace parent on the host and binds the temporary directory at the same path.
+That version mounts its Unix `docker_host` socket into the job container itself.
+A second socket bind in the container options stops the job with a duplicate mount point error.
 Use a fresh workspace and dedicated Docker state for each job.
-The jobs remove their temporary runtime containers and their tagged test image; Buildx caches remain for runner cleanup.
+The jobs remove their temporary runtime containers, their tagged test image and the temporary base image tag; Buildx caches remain for runner cleanup.
 
 Warning: a Docker socket gives repository code control of the daemon. Never run untrusted pull requests beside production services.
 
@@ -79,13 +96,13 @@ Use repository approval controls and disposable runners for untrusted contributi
 | Endpoint | Purpose |
 | --- | --- |
 | The runner's Git server | Checkout and full history |
-| `github.com`, `api.github.com`, GitHub action download endpoints | Pinned actions, source-defined upstream tags and update release notes |
+| `github.com`, `api.github.com`, GitHub action and release download endpoints | Pinned actions, source-defined upstream tags, update release notes and the Node runtime when the runner cache lacks it |
 | Docker Hub | The source-defined scanner image, base images and Dockerfile frontend |
 | `deb.debian.org` | Debian packages during image build |
 | `registry.npmjs.org` | Studio and extension dependencies |
 | `pypi.org`, `files.pythonhosted.org` | Python dependencies and uv |
 | `index.crates.io`, `static.crates.io` | Rust dependencies |
-| `nodejs.org` | Node runtime download when the runner cache lacks the selected runtime |
+| `nodejs.org` | Fallback source of the Node runtime |
 
 The runtime tests use placeholder model endpoints and do not need a provider service.
 See [image build](image.md#network-endpoints-of-the-build) for mirrors and remaining network limits.
@@ -120,7 +137,9 @@ The public checker runs immediately after the scans and stops the job on a findi
 On a portable clone it reads the generated upstream blob map without fetching upstream objects.
 
 See the [Gitea comparison](https://docs.gitea.com/usage/actions/comparison/) and [Gitea FAQ](https://docs.gitea.com/usage/actions/faq/).
-Not verified: permission enforcement, checkout behavior, job conditions or manual dispatch on your server and runner versions.
+Gitea 1.26.1 with `act_runner` 0.6.1 runs these features of the Gitea workflows: checkout, job conditions, job outputs, the schedule, manual dispatch and the artifact actions.
+Not verified: permission enforcement, pull-request events from a person and the concurrency group on that server.
+Not verified: these features on other server and runner versions.
 
 ## Development update workflow
 
@@ -152,6 +171,8 @@ On success, the dispatcher verifies the bundle prerequisite, verifies the bundle
 It pushes one explicit branch refspec without force or automatic tag following.
 Upstream branches use `sync/<tag>`; pins use `topic/pin-<kind>`.
 The pull request targets `local-dev`, never `portable`.
+On Gitea 1.26.1, a branch push or a pull request that the runner token makes starts no run of the checks workflow.
+The qualification is the check of that pull request; the push run of `local-dev` after the merge builds it again.
 Its body contains step records, manual steps, changed-path notes, configuration changes and upstream release bodies when available.
 An `[attention]` title marks any attention flag or nonempty manual steps.
 Review these records and complete every manual step before accepting the pull request.
@@ -165,6 +186,11 @@ API errors retain only the HTTP status or a fixed failure reason, not a response
 Authenticated Git logs retain only the exit code.
 Successful proposals also retain evidence for review.
 Artifacts expire after seven days; keep needed evidence in your private review records before expiry.
+On Gitea 1.26.1, the artifact list of the REST API stays empty after these uploads succeed.
+A later job of the same run still downloads the artifact.
+Not verified: artifact download from the run page.
+With a temporary directory bound from the host, the update work directory stays on the host after the job.
+Remove it in runner cleanup.
 Bundles and logs contain development history and must not become public release artifacts.
 
 ### Token and publication rights
@@ -175,7 +201,9 @@ Detection requests only contents-read permission.
 Qualification requests contents-write, pull-requests-write and issues-write permissions for branch pushes and proposal API calls.
 No package, administration or provider permission is requested.
 
-Not verified: your Gitea version's runner-token rights for branch pushes, pull requests or issues.
+On Gitea 1.26.1, the runner token reads the open proposals and creates the failure issue.
+With no `UPDATE_TOKEN` secret on that version, it also pushes the candidate branch and opens the pull request.
+Not verified: the runner-token rights on other Gitea versions.
 If necessary, create `UPDATE_TOKEN` with write access only to this development repository's code, pull requests and issues.
 Keep the token in the repository secret store, not in a file or URL.
 The dispatcher passes it only to API calls and the authenticated Git push.
@@ -346,16 +374,21 @@ set -eu
 CI_RUN=1 CI_ATTEMPT=1
 export CI_RUN CI_ATTEMPT
 image="openviking-ci:${CI_RUN}-${CI_ATTEMPT}"
-trap 'docker image rm "$image" >/dev/null 2>&1 || true' EXIT
+base_image="${image}-base"
+base_context=$(mktemp -d)
+trap 'docker image rm "$image" "$base_image" >/dev/null 2>&1 || true; rm -rf "$base_context"' EXIT
 sh scripts/build.sh test
 GATEWAY_IMAGE="$image" sh scripts/build.sh gateway
 TEST_NAME_PREFIX="openviking-ci-image-${CI_RUN}-${CI_ATTEMPT}" sh tests/test_image.sh "$image"
 OPENVIKING_IMAGE="$image" COMPOSE_TEST_PROJECT="openviking-ci-${CI_RUN}-${CI_ATTEMPT}" sh tests/test_compose.sh
 base=$(awk -F= '/^ARG PYTHON_IMAGE=/ { image=$2 } /^ARG PYTHON_DIGEST=/ { digest=$2 } END { print image "@" digest }' Dockerfile)
-sh scripts/scan.sh --level fail image "$image" "$base"
+printf 'FROM %s\n' "$base" > "$base_context/Dockerfile"
+docker buildx build --load -t "$base_image" "$base_context"
+sh scripts/scan.sh --level fail image "$image" "$base_image"
 ```
 
 The image scan checks only the layers added above the base image read from `Dockerfile`.
+The Buildx build keeps that base image in its cache, so the step loads it into the Docker image store under a temporary tag.
 The tests create temporary state and random test keys, never a provider key.
 No step publishes the test image, creates a release tag or runs a multi-platform build.
 

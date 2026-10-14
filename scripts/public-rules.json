@@ -427,16 +427,26 @@
       "rule": "document-code-path",
       "line_blob": "72ca94d91d46299eeba47386d7b0831a1a9493e2",
       "reason": "Sync table explicitly records the deleted upstream channel generator."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "1ef11f80e6f57fec90a3ce259370449e525b5463",
+      "reason": "Sync table explicitly records deliberately deleted upstream paths."
+    },
+    {
+      "rule": "document-code-path",
+      "line_blob": "a6679e70a0a4689513eff14122c5f44ef246bb1e",
+      "reason": "Sync table explicitly records deliberately deleted upstream paths."
     }
   ],
   "github_scripts": {
     ".github/scripts/build-plugin-downloads.sh": {
       "mode": "100755",
-      "blob": "5d198b8456530c66b41273fc5e630385bdfa62cd"
+      "blob": "21e8190a78f5aa60c709cfada9b7ce1a683e227b"
     },
     ".github/scripts/check-marketplace-archive.mjs": {
       "mode": "100644",
-      "blob": "341702d90c23c5a7db21bf5e8a45bd3e9951e1f1"
+      "blob": "d3b0a7108b516bb97a30dce2756caba95e919e18"
     },
     ".github/scripts/check-plugin-version-bumps.sh": {
       "mode": "100755",

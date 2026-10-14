@@ -590,7 +590,8 @@ git(development_bare, "symbolic-ref", "HEAD", "refs/heads/local-dev")
 result, calls = promote(path, "--tag", "portable-v0.1.10", "--push", "origin")
 check("origin name does not imply development mode", result.returncode == 1 and
       "foreign refs: 3" in result.stdout and "refs/heads/local-dev" in result.stdout)
-strict_calls = calls
+# The audit failed after the push. Repeat the strict push on the same remote state.
+result, strict_calls = promote(path, "--tag", "portable-v0.1.10", "--push", "origin")
 development_before = git(development_bare, "for-each-ref")
 planned, planned_calls = promote(path, "--tag", "portable-v0.1.10", "--push", "origin", "--development-remote", "--dry-run")
 result, calls = promote(path, "--tag", "portable-v0.1.10", "--push", "origin", "--development-remote")
@@ -657,6 +658,83 @@ refuses("push dry-run preserves existing root safety boundary", path,
         ("--tag", "portable-v0.2.0", "--push", "tag-only", "--dry-run"), reason="root tag cannot replace")
 result, calls = promote(root_path, "--tag", "portable-v1.0.0", "--push", "shared")
 check("existing published root can be pushed again", result.returncode == 0)
+# A push scans only the commits that the remote does not have. The old
+# baseline accepted the host value of the first snapshot; the current one does not.
+ranged = fixture("push-range")
+(ranged / "scripts/scan.sh").write_text("""#!/bin/sh
+printf 'scan %s|%s|%s|exclude=%s\\n' "$1 ${2:-} ${3:-}" "${4:-}" "${SCAN_REF:-}" "${SCAN_EXCLUDE_UPSTREAM:-}" >>"$TEST_LOG"
+[ "${3:-}" = history ] || exit 0
+# An added line with a pattern of the tracked deny list is a finding, unless
+# the baseline lists the line. The lines of the deny list itself are no finding.
+git log -p --format='commit %H' "$4" | awk '
+    BEGIN {
+        while ((getline line <"scripts/host-values.deny") > 0) if (line != "") pattern[line] = 1
+        while ((getline line <"scripts/baseline") > 0) accepted[line] = 1
+    }
+    /^commit / { commit = $2; next }
+    /^[+][+][+] / { file = substr($0, 7); next }
+    /^[+]/ && file != "scripts/host-values.deny" {
+        text = substr($0, 2)
+        if (text in accepted) next
+        for (p in pattern) if (index(text, p)) { print "finding " commit ": " text >"/dev/stderr"; found = 1 }
+    }
+    END { exit found }
+'
+""")
+host_value = "172_17_0_1".replace("_", ".")
+host_line = "bridge address " + host_value + ":9000"
+(ranged / "scripts/host-values.deny").write_text(host_value + "\n")
+(ranged / "scripts/baseline").write_text(host_line + "\n")
+(ranged / "guide.md").write_text(host_line + "\n")
+git(ranged, "add", "-A")
+git(ranged, "commit", "-qm", "host value of the old baseline")
+result, calls = promote(ranged, "--version", "1.0.0")
+first_snapshot = git(ranged, "rev-parse", "portable")
+check("old baseline accepts the host value of the first snapshot", result.returncode == 0)
+(ranged / "scripts/baseline").write_text("")
+(ranged / "a.txt").write_text("clean change\n")
+git(ranged, "add", "-A")
+git(ranged, "commit", "-qm", "current baseline")
+result, calls = promote(ranged, "--version", "1.0.1")
+second_snapshot = git(ranged, "rev-parse", "portable")
+pushed_range = first_snapshot + ".." + second_snapshot
+check("second snapshot is clean", result.returncode == 0 and
+      calls[-1] == "scan --level fail history|" + pushed_range + "|refs/heads/portable|exclude=0")
+ranged_bare = remote(ranged)
+git(ranged, "push", "-q", "shared", first_snapshot + ":refs/heads/portable", "refs/tags/portable-v1.0.0")
+result, calls = promote(ranged, "--tag", "portable-v1.0.1", "--push", "shared", "--dry-run")
+if result.returncode:
+    print(result.stdout + result.stderr)
+check("push scans only the commits that the remote does not have", result.returncode == 0 and
+      calls[-1] == "scan --level fail history|" + pushed_range + "|refs/heads/portable|exclude=0" and
+      "promote: history scan range " + pushed_range + "\n" in result.stdout and
+      git(ranged_bare, "rev-parse", "portable") == first_snapshot)
+empty_bare = remote(ranged, "empty")
+result, calls = refuses("first push scans the whole chain and finds the first snapshot", ranged,
+                        ("--tag", "portable-v1.0.1", "--push", "empty", "--dry-run"))
+check("whole-chain scan names only the first snapshot",
+      calls[-1] == "scan --level fail history|" + second_snapshot + "|refs/heads/portable|exclude=0" and
+      "promote: history scan of the whole chain (first push)\n" in result.stdout and
+      "finding " + first_snapshot in result.stderr and "finding " + second_snapshot not in result.stderr and
+      git(empty_bare, "for-each-ref") == "")
+diverged_bare = remote(ranged, "diverged")
+other = git(ranged, "commit-tree", "-p", first_snapshot, "-m", "other snapshot", first_snapshot + "^{tree}")
+git(ranged, "push", "-q", "diverged", other + ":refs/heads/portable")
+result, calls = refuses("diverged remote portable is refused", ranged,
+                        ("--tag", "portable-v1.0.1", "--push", "diverged", "--dry-run"), reason="chain diverged")
+check("diverged remote gets no history scan and no ref", len(calls) == 3 and
+      git(diverged_bare, "rev-parse", "portable") == other)
+unknown_bare = remote(ranged, "unknown")
+unknown = git(unknown_bare, "commit-tree", "-m", "unknown snapshot", git(unknown_bare, "write-tree"))
+git(unknown_bare, "update-ref", "refs/heads/portable", unknown)
+refuses("remote portable unknown to the local repository is refused", ranged,
+        ("--tag", "portable-v1.0.1", "--push", "unknown", "--dry-run"), reason="chain diverged")
+result, calls = promote(ranged, "--tag", "portable-v1.0.1", "--push", "shared")
+check("push of the range moves the remote to the second snapshot", result.returncode == 0 and
+      git(ranged_bare, "rev-parse", "portable") == second_snapshot)
+result, calls = promote(ranged, "--tag", "portable-v1.0.1", "--push", "shared", "--dry-run")
+check("a published tip gives an empty scan range", result.returncode == 0 and
+      calls[-1] == "scan --level fail history|" + second_snapshot + ".." + second_snapshot + "|refs/heads/portable|exclude=0")
 # Capture each push invocation through a real synthetic pre-push hook.
 hook_path = fixture("push-hook")
 hook_bare = remote(hook_path)

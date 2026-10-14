@@ -136,7 +136,7 @@ The following scripts stay unchanged. Run them with the Docker CLI and `DOCKER_H
 
 | Script | Direct Docker calls | Podman status |
 | --- | --- | --- |
-| `tests/test_image.sh` | Image inspection, container start, execution, logs and removal | Not verified with Podman. It needs the Docker CLI against the Podman socket. |
+| `tests/test_image.sh` | Image inspection, container start, execution, logs and removal | Passed on Linux `amd64` with Podman 5.8.7 and the Docker CLI against its socket. Not verified on a Mac. |
 | `tests/test_compose.sh` | `docker compose`, image and health inspection, ports and cleanup | Not verified with Podman. It needs the Docker CLI, the Compose plugin and the Podman socket. |
 | `scripts/scan.sh` | Engine detection, scanner containers and image inspection or export | Not verified with Podman. This page uses the Docker scanner engine against the Podman socket. |
 
@@ -146,7 +146,9 @@ The script then tries `docker export`. Not verified with Podman: either method.
 The Docker Compose documentation defines `pull_policy: never` and the `healthcheck` fields of `compose.yaml`.
 `never` uses the local image and fails if it is absent.
 The health check runs `openviking-entrypoint --healthcheck` with the configured interval, timeout, retries and startup grace period.
-Not verified: these two features through the Podman socket. The Docker Compose documentation does not establish that compatibility.
+On Linux `amd64` with Podman 5.8.7, `never` refused an absent image.
+In the same run, the container received the health check settings of `compose.yaml`.
+Not verified: an automatic health check run with Podman, and both features on a Mac. The Docker Compose documentation does not establish that compatibility.
 Keep both settings; do not remove them to bypass a failing test.
 
 ## Steps
@@ -188,6 +190,7 @@ Keep both settings; do not remove them to bypass a failing test.
    ```
 
    Without `SOURCE_URL`, `org.opencontainers.image.source` names upstream ([image.md](image.md#variables)).
+   The Podman path of `scripts/build.sh` passed on Linux `amd64` with Podman 5.8.7; this is not a Mac result.
 5. Check the configuration and start. Not verified on a Mac.
 
    ```sh
@@ -205,6 +208,7 @@ Keep both settings; do not remove them to bypass a failing test.
 
    The Python verifier is unchanged. A successful health check can mark the container healthy during the 60 s startup grace period.
    An isolated Linux Docker test first passed at 10.2 s; this is not a Mac timing guarantee.
+   On Linux `amd64`, Podman 5.8.7 with Docker Compose 5.5.1 passed steps 5 and 6 and `podman compose down`; this is not a Mac result.
    See [the startup check](operations.md#start) for the conditions.
 7. Run the supported build checks and the unchanged tests. Not verified on a Mac.
 

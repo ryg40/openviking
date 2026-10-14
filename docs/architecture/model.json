@@ -1,0 +1,891 @@
+{
+  "meta": {
+    "title": "OpenViking architecture explorer",
+    "build": "{{build.name}}",
+    "note": "{{build.note}}",
+    "value_label": "{{value.label}}"
+  },
+  "groups": {
+    "clients": {"label": "Clients", "hue": "blue"},
+    "access": {"label": "Network path", "hue": "violet"},
+    "container": {"label": "openviking container", "hue": "teal"},
+    "host": {"label": "Host and Compose", "hue": "amber"},
+    "models": {"label": "Model endpoints", "hue": "orange"},
+    "api": {"label": "HTTP API", "hue": "blue"},
+    "root": {"label": "Service object", "hue": "slate"},
+    "services": {"label": "Service layer", "hue": "teal"},
+    "retrieval": {"label": "Retrieval", "hue": "violet"},
+    "sessions": {"label": "Sessions and memory", "hue": "rose"},
+    "ingest": {"label": "Parse and queues", "hue": "amber"},
+    "storage": {"label": "Storage", "hue": "green"},
+    "modelclients": {"label": "Model clients", "hue": "orange"},
+    "upstream": {"label": "Upstream", "hue": "slate"},
+    "automation": {"label": "Automation", "hue": "violet"},
+    "work": {"label": "Work branches", "hue": "blue"},
+    "integration": {"label": "Private integration", "hue": "cyan"},
+    "release": {"label": "Public release", "hue": "green"},
+    "base": {"label": "Pinned base images", "hue": "slate"},
+    "build": {"label": "Image build", "hue": "amber"},
+    "targets": {"label": "Bake targets", "hue": "orange"},
+    "run": {"label": "Run", "hue": "teal"}
+  },
+  "edge_types": {
+    "http": {"label": "HTTP request", "hue": "blue"},
+    "mcp": {"label": "MCP over HTTP", "hue": "violet"},
+    "net": {"label": "Network path", "hue": "cyan", "dash": "2 4"},
+    "file": {"label": "Reads a file or variables", "hue": "amber", "dash": "6 4"},
+    "mount": {"label": "Bind mount", "hue": "green", "dash": "10 4"},
+    "process": {"label": "Starts a process", "hue": "slate"},
+    "call": {"label": "In-process call", "hue": "slate"},
+    "queue": {"label": "Queue message", "hue": "violet", "dash": "6 3"},
+    "store": {"label": "Storage read or write", "hue": "green"},
+    "model": {"label": "Model API call", "hue": "orange"},
+    "model_optional": {"label": "Optional model call", "hue": "orange", "dash": "3 4"},
+    "git": {"label": "Git ref change", "hue": "blue"},
+    "ci": {"label": "Automated proposal", "hue": "violet", "dash": "6 3"},
+    "push": {"label": "Push to a remote", "hue": "rose"},
+    "build": {"label": "Build input", "hue": "amber"},
+    "run": {"label": "Runs the image", "hue": "teal"}
+  },
+  "views": [
+    {
+      "id": "runtime",
+      "title": "Runtime and deployment",
+      "short": "Runtime",
+      "desc": "The deployed stack: the clients, the network path, the openviking container, the host files and the model endpoints. Each edge names the protocol or the file.",
+      "layout": {"columns": [["clients"], ["access", "host"], ["container"], ["models"]]},
+      "nodes": [
+        {
+          "id": "cc_plugin", "group": "clients", "label": "Claude Code memory plugin", "sub": "hooks + MCP proxy",
+          "summary": "The plugin gives Claude Code long-term memory. Hooks recall context before each prompt and capture the turn after it. A local stdio proxy forwards MCP requests to the /mcp endpoint of the server.",
+          "files": ["examples/claude-code-memory-plugin/hooks/hooks.json", "examples/claude-code-memory-plugin/scripts/auto-recall.mjs", "examples/claude-code-memory-plugin/scripts/auto-capture.mjs", "examples/claude-code-memory-plugin/servers/mcp-proxy.mjs"],
+          "keys": ["ovcli.conf: url", "ovcli.conf: api_key"],
+          "value": "{{client.server_url}}"
+        },
+        {
+          "id": "pi_ext", "group": "clients", "label": "Pi extension", "sub": "MCP bridge + session API",
+          "summary": "The extension connects the Pi coding agent to OpenViking. Its tools reach the server over MCP through an MCP bridge. Session sync and context reads use the REST API under /api/v1/sessions.",
+          "files": ["examples/pi-coding-agent-extension/index.ts", "examples/pi-coding-agent-extension/client.ts", "examples/pi-coding-agent-extension/lib/mcp-bridge.mjs", "examples/pi-coding-agent-extension/config.ts"],
+          "value": "{{client.server_url}}"
+        },
+        {
+          "id": "ov_cli", "group": "clients", "label": "ov CLI", "sub": "Rust command-line client",
+          "summary": "The ov command reads and writes context from a terminal. It sends each command to the HTTP API. The image also contains it.",
+          "files": ["crates/ov_cli/src/main.rs", "crates/ov_cli/src/client.rs", "crates/ov_cli/src/config.rs", "examples/ovcli.conf.example"],
+          "keys": ["ovcli.conf: url", "ovcli.conf: api_key"],
+          "value": "{{client.server_url}}"
+        },
+        {
+          "id": "sdks", "group": "clients", "label": "SDKs", "sub": "Python, TypeScript, Go",
+          "summary": "The SDKs wrap the HTTP API for application code. The Python SDK has the class SyncHTTPClient.",
+          "files": ["sdk/python/", "sdk/typescript/", "sdk/go/"]
+        },
+        {
+          "id": "browser", "group": "clients", "label": "Web Studio (browser)", "sub": "{{host.studio_url}}",
+          "summary": "Web Studio is the browser interface of the server. The browser loads the bundle from /studio/ and then calls the HTTP API.",
+          "files": ["web-studio/src/", "web-studio/vite.config.ts"],
+          "value": "{{host.studio_url}}"
+        },
+        {
+          "id": "mcp_client", "group": "clients", "label": "Other MCP clients", "sub": "Streamable HTTP /mcp",
+          "summary": "Any MCP client can connect to the /mcp endpoint. The endpoint uses the same authentication as the HTTP API. OAuth 2.1 routes are present when oauth.enabled is true.",
+          "files": ["docs/en/guides/06-mcp-integration.md", "docs/en/guides/11-oauth.md"],
+          "keys": ["oauth.enabled"]
+        },
+        {
+          "id": "ingress", "group": "access", "label": "{{ingress.label}}", "sub": "{{host.public_url}}",
+          "summary": "The ingress proxy ends TLS for the public URL. It reaches the container by name over an external Docker network. compose.yaml has no proxy service; the host override adds the network.",
+          "files": ["docs/host-configuration.md", ".local/compose.host.yaml"],
+          "keys": ["OPENVIKING_PUBLIC_BASE_URL", "server.cors_origins"],
+          "value": "{{ingress.value}}"
+        },
+        {
+          "id": "port", "group": "access", "label": "Published port", "sub": "{{runtime.bind}}:{{runtime.port}} → 1933",
+          "summary": "Compose publishes container port 1933 on the loopback address by default. Clients on the host use it, and scripts/verify.py can check the server through it. Keep loopback unless the ingress needs more.",
+          "files": ["compose.yaml", ".env.example", "scripts/verify.py"],
+          "keys": ["OPENVIKING_BIND", "OPENVIKING_PORT"],
+          "value": "{{runtime.bind}}:{{runtime.port}}"
+        },
+        {
+          "id": "compose", "group": "host", "label": "Compose files", "sub": "{{runtime.compose_files}}",
+          "summary": "compose.yaml defines one service in the Compose project openviking. It has no build section and sets pull_policy: never. A host adds .local/compose.host.yaml through COMPOSE_FILE.",
+          "files": ["compose.yaml", "docs/host-configuration.md", ".local/compose.host.yaml"],
+          "keys": ["COMPOSE_FILE", "OPENVIKING_IMAGE"],
+          "value": "{{runtime.compose_files}}"
+        },
+        {
+          "id": "env", "group": "host", "label": ".env", "sub": "runtime variables, not tracked",
+          "summary": "The .env file holds the root API key and the host values that Compose reads. Git ignores it. .env.example lists each variable with a portable default.",
+          "files": [".env.example", "docs/host-configuration.md", "docs/secret-handling.md"],
+          "keys": ["OPENVIKING_ROOT_API_KEY", "OPENVIKING_IMAGE", "OPENVIKING_PUBLIC_BASE_URL", "OPENVIKING_BIND", "OPENVIKING_PORT", "COMPOSE_FILE"],
+          "value": "{{env.value}}"
+        },
+        {
+          "id": "image", "group": "host", "label": "Image", "sub": "{{runtime.image_short}}",
+          "summary": "OPENVIKING_IMAGE selects the image. The default is the local build openviking:local. scripts/build.sh makes it; the repository view shows the build.",
+          "files": ["compose.yaml", ".env.example", "scripts/build.sh", "docker-bake.hcl"],
+          "keys": ["OPENVIKING_IMAGE"],
+          "value": "{{runtime.image}}",
+          "drill": {"view": "repository", "node": "img", "label": "Show the image build"}
+        },
+        {
+          "id": "engine", "group": "host", "label": "Docker engine", "sub": "restart: unless-stopped",
+          "summary": "Docker runs the container from the local image and never pulls it. It runs the health check every 30 seconds. It restarts the container unless an operator stops it.",
+          "files": ["compose.yaml"],
+          "value": "{{runtime.engine_value}}"
+        },
+        {
+          "id": "conf", "group": "host", "label": "data/ov.conf", "sub": "server configuration",
+          "summary": "ov.conf configures the server, storage, models, search and VikingBot. It lies in the state directory, so the container reads it from the bind mount. It holds credentials, and Git ignores data/.",
+          "files": ["examples/ov.conf.quickstart", "examples/ov.conf.example", "docs/operations.md"],
+          "keys": ["server", "storage", "embedding", "vlm", "rerank", "bot", "default_search_mode"],
+          "value": "{{conf.value}}"
+        },
+        {
+          "id": "state", "group": "host", "label": "State directory", "sub": "./data → /app/.openviking",
+          "summary": "One bind mount holds the configuration and all stored context. With the default backends, the workspace holds the RAGFS files, the SQLite queue and the local vector index. The mount is not a backup.",
+          "files": ["compose.yaml", "docs/operations.md"],
+          "keys": ["storage.workspace", "storage.agfs.backend", "storage.agfs.queuefs.backend", "storage.vectordb.backend"],
+          "value": "{{runtime.state}}"
+        },
+        {
+          "id": "entrypoint", "group": "container", "label": "openviking-entrypoint", "sub": "shell supervisor",
+          "summary": "The entrypoint script waits for ov.conf, starts openviking-server and forwards signals. Until ov.conf exists, a small health server answers 503. It starts VikingBot by default; --without-bot turns it off.",
+          "files": ["deploy/docker/openviking-entrypoint.sh", "deploy/docker/pending_health_server.py", "Dockerfile"],
+          "keys": ["OPENVIKING_WITH_BOT", "OPENVIKING_SERVER_HOST", "OPENVIKING_SERVER_PORT", "server.port"],
+          "value": "command: --with-bot"
+        },
+        {
+          "id": "server", "group": "container", "label": "openviking-server", "sub": "FastAPI on port 1933",
+          "summary": "The server process holds the REST API, the /mcp endpoint, Web Studio, /health and /metrics. One OpenVikingService object behind it does the work. Open the drill-down view to see its parts.",
+          "files": ["openviking/server/app.py", "openviking/server/bootstrap.py", "openviking_cli/server_bootstrap.py"],
+          "keys": ["server.host", "server.port", "server.public_base_url", "server.auth_mode", "server.cors_origins"],
+          "value": "{{runtime.server_value}}",
+          "drill": {"view": "internals", "label": "Open the server internals"}
+        },
+        {
+          "id": "mcp", "group": "container", "label": "/mcp endpoint", "sub": "FastMCP, 20 tools",
+          "summary": "The /mcp route is a stateless FastMCP app inside the server. It uses the same identity check as the REST API. Its 20 tools include find, search, read, write, remember and add_resource.",
+          "files": ["openviking/server/mcp_endpoint.py", "openviking/server/app.py"],
+          "keys": ["oauth.enabled"],
+          "drill": {"view": "internals", "node": "mcp", "label": "Show in the server internals"}
+        },
+        {
+          "id": "studio", "group": "container", "label": "Web Studio files", "sub": "/studio/",
+          "summary": "The image holds the built Studio bundle. The server serves it under /studio/ and redirects / to /studio/. The Dockerfile builds it in the web-studio-builder stage.",
+          "files": ["openviking/server/app.py", "web-studio/", "Dockerfile"],
+          "keys": ["OPENVIKING_WEB_STUDIO_DIR"]
+        },
+        {
+          "id": "bot", "group": "container", "label": "VikingBot", "sub": "gateway 127.0.0.1:18790",
+          "summary": "VikingBot is an agent runtime with OpenViking as its long-term context. openviking-server starts it as a child process. Its port stays inside the container; the server proxies /bot/v1 to it.",
+          "files": ["bot/vikingbot/cli/commands.py", "bot/vikingbot/config/loader.py", "openviking/server/routers/bot.py", "openviking/server/bootstrap.py"],
+          "keys": ["bot.agents.model", "bot.agents.api_base", "bot.gateway.port", "bot.ov_server.server_url", "server.with_bot"]
+        },
+        {
+          "id": "embedding", "group": "models", "label": "Embedding endpoint", "sub": "{{embedding.model}}",
+          "summary": "The embedding model turns text into vectors for the index and for each query. The server calls it through the provider that embedding.dense.provider names. The model runs outside the container.",
+          "files": ["openviking/models/embedder/", "examples/ov.conf.quickstart"],
+          "keys": ["embedding.dense.provider", "embedding.dense.api_base", "embedding.dense.model", "embedding.dense.dimension"],
+          "value": "{{embedding.value}}"
+        },
+        {
+          "id": "vlm", "group": "models", "label": "VLM endpoint", "sub": "{{vlm.model}}",
+          "summary": "The VLM is a language model, with vision when media is on. It writes the L0 and L1 summaries, plans queries and extracts memories. The server calls it through the provider that vlm.provider names.",
+          "files": ["openviking/models/vlm/", "examples/ov.conf.quickstart"],
+          "keys": ["vlm.provider", "vlm.api_base", "vlm.model", "vlm.media.enabled"],
+          "value": "{{vlm.value}}"
+        },
+        {
+          "id": "rerank", "group": "models", "label": "Rerank endpoint", "sub": "{{rerank.sub}}",
+          "summary": "A rerank model sorts the recalled candidates again. The server uses it only in thinking search mode and only when a rerank section exists. Without it, search uses the vector scores.",
+          "files": ["openviking/models/rerank/", "openviking_cli/utils/config/rerank_config.py"],
+          "keys": ["rerank.provider", "rerank.model", "rerank.api_base", "rerank.threshold"],
+          "value": "{{rerank.value}}"
+        },
+        {
+          "id": "botmodel", "group": "models", "label": "Bot agent model", "sub": "{{bot.model}}",
+          "summary": "VikingBot sends its agent turns to this model. The section bot.agents sets it. Without bot.agents.model, VikingBot uses the vlm settings.",
+          "files": ["bot/vikingbot/config/schema.py", "bot/vikingbot/config/loader.py"],
+          "keys": ["bot.agents.provider", "bot.agents.model", "bot.agents.api_base"],
+          "value": "{{bot.value}}"
+        }
+      ],
+      "edges": [
+        {"from": "cc_plugin", "to": "ingress", "type": "http", "label": "HTTP /api/v1 + /mcp",
+          "detail": "Hooks send recall and capture requests to the REST API. The stdio proxy forwards MCP JSON-RPC to /mcp. Each request carries an API key of the user.",
+          "files": ["examples/claude-code-memory-plugin/hooks/hooks.json", "examples/claude-code-memory-plugin/servers/mcp-proxy.mjs"]},
+        {"from": "pi_ext", "to": "ingress", "type": "mcp", "label": "/mcp + /api/v1/sessions",
+          "detail": "Tool calls go to /mcp. Session metadata, the assembled context and the session commit use /api/v1/sessions.",
+          "files": ["examples/pi-coding-agent-extension/client.ts", "examples/pi-coding-agent-extension/lib/mcp-bridge.mjs"]},
+        {"from": "ov_cli", "to": "ingress", "type": "http", "label": "HTTP /api/v1",
+          "detail": "Each ov command is one or more REST requests with the API key from ovcli.conf."},
+        {"from": "ov_cli", "to": "port", "type": "http", "label": "loopback on the host",
+          "detail": "A client on the host can use the published loopback port instead of the public URL. Any client can do this; the graph shows it for the CLI only."},
+        {"from": "sdks", "to": "ingress", "type": "http", "label": "HTTP /api/v1",
+          "detail": "The SDKs send REST requests to the server URL that the application gives them."},
+        {"from": "browser", "to": "ingress", "type": "http", "label": "HTTPS /studio/ + /api/v1",
+          "detail": "The browser loads the Studio bundle and then calls the REST API through the same origin."},
+        {"from": "mcp_client", "to": "ingress", "type": "mcp", "label": "MCP /mcp",
+          "detail": "MCP JSON-RPC over Streamable HTTP. The endpoint is stateless."},
+        {"from": "ingress", "to": "server", "type": "net", "label": "network {{runtime.network}} → :1933",
+          "detail": "The proxy forwards the REST routes and /health to port 1933 of the container over the external Docker network. The container joins that network through the host override.",
+          "files": [".local/compose.host.yaml", "docs/host-configuration.md"]},
+        {"from": "ingress", "to": "mcp", "type": "mcp", "label": "/mcp",
+          "detail": "The same network path carries MCP requests to the /mcp route of the server."},
+        {"from": "ingress", "to": "studio", "type": "http", "label": "/studio/",
+          "detail": "The same network path carries the Studio files."},
+        {"from": "port", "to": "server", "type": "net", "label": "TCP → 1933",
+          "detail": "Docker maps the host address and port to port 1933 in the container.",
+          "keys": ["OPENVIKING_BIND", "OPENVIKING_PORT"]},
+        {"from": "env", "to": "compose", "type": "file", "label": "variables + COMPOSE_FILE",
+          "detail": "Compose reads .env for variable substitution. COMPOSE_FILE selects compose.yaml and the host override.",
+          "keys": ["COMPOSE_FILE", "OPENVIKING_IMAGE", "OPENVIKING_BIND", "OPENVIKING_PORT", "OPENVIKING_PUBLIC_BASE_URL"]},
+        {"from": "env", "to": "entrypoint", "type": "file", "label": "env_file: .env",
+          "detail": "env_file passes all .env variables into the container environment. compose.yaml also sets OPENVIKING_ROOT_API_KEY, OPENVIKING_PUBLIC_BASE_URL, OPENVIKING_SERVER_HOST and OPENVIKING_SERVER_PORT. The server does not read COMPOSE_FILE.",
+          "keys": ["OPENVIKING_ROOT_API_KEY", "OPENVIKING_PUBLIC_BASE_URL", "OPENVIKING_SERVER_HOST", "OPENVIKING_SERVER_PORT"]},
+        {"from": "compose", "to": "engine", "type": "process", "label": "docker compose up -d",
+          "detail": "Compose creates the container from the merged files. pull_policy: never makes a missing image an error.",
+          "files": ["compose.yaml"]},
+        {"from": "image", "to": "engine", "type": "run", "label": "OPENVIKING_IMAGE",
+          "detail": "The engine creates the container from the image that OPENVIKING_IMAGE names. The image must be in the local store."},
+        {"from": "engine", "to": "entrypoint", "type": "process", "label": "starts: --with-bot",
+          "detail": "The container runs ENTRYPOINT openviking-entrypoint with the command --with-bot from compose.yaml."},
+        {"from": "engine", "to": "server", "type": "http", "label": "health check every 30 s",
+          "detail": "Docker runs openviking-entrypoint --healthcheck in the container. The script calls GET /health on the local port. Interval 30 s, timeout 5 s, 5 retries, start period 60 s. A healthy state does not prove authenticated access."},
+        {"from": "entrypoint", "to": "server", "type": "process", "label": "starts openviking-server",
+          "detail": "The script starts openviking-server with the host, the port and --with-bot, waits for /health and forwards signals."},
+        {"from": "server", "to": "bot", "type": "process", "label": "child process + /bot/v1",
+          "detail": "With --with-bot, the server starts vikingbot gateway on 127.0.0.1:18790 and proxies /bot/v1 to it."},
+        {"from": "bot", "to": "server", "type": "http", "label": "HTTP /api/v1",
+          "detail": "VikingBot reads and writes its context through the REST API of the server, inside the container."},
+        {"from": "mcp", "to": "server", "type": "call", "label": "same services",
+          "detail": "The MCP tools call the same service layer and the same identity check as the REST routers."},
+        {"from": "server", "to": "studio", "type": "call", "label": "serves /studio/",
+          "detail": "The server serves the files of openviking/web_studio/dist with a single-page fallback."},
+        {"from": "conf", "to": "server", "type": "file", "label": "reads ov.conf",
+          "detail": "The server and VikingBot read ov.conf at start. The server ignores the bot section; VikingBot reads it."},
+        {"from": "server", "to": "state", "type": "mount", "label": "reads + writes the workspace",
+          "detail": "The server stores files, queues and vectors under storage.workspace inside the bind mount.",
+          "keys": ["storage.workspace"]},
+        {"from": "state", "to": "conf", "type": "mount", "label": "contains ov.conf",
+          "detail": "ov.conf lies at the top of the state directory, next to the workspace."},
+        {"from": "server", "to": "embedding", "type": "model", "label": "embeddings",
+          "detail": "Text and queries go to the embedding endpoint. Vectors come back.",
+          "keys": ["embedding.dense.api_base", "embedding.dense.model"]},
+        {"from": "server", "to": "vlm", "type": "model", "label": "chat completions",
+          "detail": "Prompts for L0 and L1 summaries, query planning, archive summaries and memory extraction go to the VLM endpoint.",
+          "keys": ["vlm.api_base", "vlm.model"]},
+        {"from": "server", "to": "rerank", "type": "model_optional", "label": "rerank, if configured",
+          "detail": "Candidate lists go to the rerank endpoint in thinking mode when a rerank section exists.",
+          "keys": ["rerank.provider", "rerank.api_base"]},
+        {"from": "bot", "to": "botmodel", "type": "model", "label": "agent turns",
+          "detail": "The agent loop of VikingBot sends its prompts and tool results to the bot model.",
+          "keys": ["bot.agents.model", "bot.agents.api_base"]}
+      ]
+    },
+    {
+      "id": "internals",
+      "title": "Server internals",
+      "short": "Internals",
+      "desc": "The parts of openviking-server in the current source tree. The REST routers and /mcp call one service layer. Retrieval, sessions and imports use VikingFS, the queues and the model clients.",
+      "layout": {
+        "columns": [["api", "root"], ["services"], ["retrieval", "sessions", "ingest"], ["storage", "modelclients"]],
+        "group_cols": {"sessions": 2, "ingest": 2},
+        "col_gaps": [170, 200, 330],
+        "group_gap": 60,
+        "grid_gap": [44, 40],
+        "labels": "avoid"
+      },
+      "nodes": [
+        {
+          "id": "http", "group": "api", "label": "HTTP server", "sub": "FastAPI + uvicorn",
+          "summary": "create_app builds the FastAPI app with the REST routers under /api/v1, the /mcp route and the Studio routes. bootstrap.py parses the arguments and runs uvicorn on port 1933.",
+          "files": ["openviking/server/app.py", "openviking/server/bootstrap.py", "openviking/server/routers/", "openviking_cli/server_bootstrap.py"],
+          "keys": ["server.host", "server.port", "server.workers", "server.cors_origins", "server.public_base_url"],
+          "value": "{{runtime.public_base_url}}",
+          "drill": {"view": "runtime", "node": "server", "label": "Show in the runtime view"}
+        },
+        {
+          "id": "mcp", "group": "api", "label": "/mcp endpoint", "sub": "20 MCP tools",
+          "summary": "A stateless FastMCP app is mounted at /mcp. An identity middleware uses the same resolve_identity as the REST API. The tools call the same services: find, search, read, write, edit, remember, add_resource, grep, glob and more.",
+          "files": ["openviking/server/mcp_endpoint.py"],
+          "keys": ["oauth.enabled"]
+        },
+        {
+          "id": "auth", "group": "api", "label": "Authentication", "sub": "{{conf.auth_mode}}",
+          "summary": "An auth plugin resolves the identity of each request from X-API-Key or a bearer token. The root key manages accounts, and user keys are stored in RAGFS. Auth plugins exist for api_key, trusted, dev, oidc and ldap.",
+          "files": ["openviking/server/auth/", "openviking/server/api_keys/new.py", "openviking/server/identity.py", "openviking/server/config.py"],
+          "keys": ["server.auth_mode", "server.root_api_key", "server.oidc", "server.ldap", "oauth"],
+          "value": "{{conf.auth_mode}}"
+        },
+        {
+          "id": "observ", "group": "api", "label": "Health and metrics", "sub": "/health, /ready, /metrics",
+          "summary": "/health needs no key and reports the version and the auth mode. /ready probes RAGFS, the vector index and the API key manager. /metrics returns Prometheus text when metrics are on.",
+          "files": ["openviking/server/routers/system.py", "openviking/server/routers/metrics.py", "openviking/metrics/"],
+          "keys": ["server.observability.metrics.enabled"]
+        },
+        {
+          "id": "core", "group": "root", "label": "OpenVikingService", "sub": "builds and wires the services",
+          "summary": "One OpenVikingService object builds the services, the queues and the storage clients at start. The REST routers and the MCP tools reach every service through it.",
+          "files": ["openviking/service/core.py"],
+          "keys": ["queue_workers", "enable_watch_scheduler"]
+        },
+        {
+          "id": "fs", "group": "services", "label": "FSService", "sub": "ls, read, tree, grep, glob",
+          "summary": "FSService does file system operations on viking:// URIs: ls, mkdir, rm, mv, tree, stat, read, abstract, overview, grep and glob.",
+          "files": ["openviking/service/fs_service.py"]
+        },
+        {
+          "id": "search", "group": "services", "label": "SearchService", "sub": "find, search",
+          "summary": "SearchService answers find and search. find uses the query as it is. search can add intent analysis from the context of a session.",
+          "files": ["openviking/service/search_service.py"],
+          "keys": ["default_search_mode", "default_search_limit", "retrieval.enable_intent"],
+          "drill": {"view": "flows", "flow": "retrieve", "label": "Play the retrieve flow"}
+        },
+        {
+          "id": "session", "group": "services", "label": "SessionService", "sub": "sessions, commit",
+          "summary": "SessionService creates, lists and deletes sessions and starts a commit. The commit runs asynchronously in two phases.",
+          "files": ["openviking/service/session_service.py"],
+          "drill": {"view": "flows", "flow": "commit", "label": "Play the session commit flow"}
+        },
+        {
+          "id": "resource", "group": "services", "label": "ResourceService", "sub": "add_resource, add_skill",
+          "summary": "ResourceService imports resources and skills. It reserves the target URI, makes a source plan and puts a job on a queue. With wait=true, the call waits for the task.",
+          "files": ["openviking/service/resource_service.py"],
+          "drill": {"view": "flows", "flow": "add", "label": "Play the add context flow"}
+        },
+        {
+          "id": "pack", "group": "services", "label": "PackService", "sub": "ovpack export, import, backup",
+          "summary": "PackService exports and imports ovpack archives. It also makes and restores ovpack backups.",
+          "files": ["openviking/service/pack_service.py"]
+        },
+        {
+          "id": "debug", "group": "services", "label": "DebugService", "sub": "ObserverService",
+          "summary": "DebugService holds the ObserverService. The observer reports the state of the queues, the vector index, RAGFS and the model clients.",
+          "files": ["openviking/service/debug_service.py"]
+        },
+        {
+          "id": "tasks", "group": "services", "label": "TaskTracker", "sub": "state of async jobs",
+          "summary": "The task tracker records each asynchronous job and its state in a persistent store. Callers with wait=true and the /api/v1/tasks routes read it.",
+          "files": ["openviking/service/task_tracker.py", "openviking/service/task_store.py", "openviking/server/routers/tasks.py"]
+        },
+        {
+          "id": "others", "group": "services", "label": "Other services", "sub": "watch, compile, deletion",
+          "summary": "The service layer also has WatchScheduler, SessionAutoCommitScheduler, DeletionService, CompileService, AgentEvolutionService, ExternalTaskService, ReindexExecutor and the privacy config service. The upstream concept page does not list them.",
+          "files": ["openviking/resource/watch_scheduler.py", "openviking/service/session_auto_commit.py", "openviking/service/deletion.py", "openviking/service/compile_service.py"],
+          "keys": ["enable_watch_scheduler", "memory.session_auto_commit", "compile_api", "agent_evolution"]
+        },
+        {
+          "id": "intent", "group": "retrieval", "label": "IntentAnalyzer", "sub": "0 to 5 typed queries",
+          "summary": "IntentAnalyzer turns a query and the session context into zero to five typed queries. Only search uses it, and only when retrieval.enable_intent is on and a session gives context. It calls the query planner model.",
+          "files": ["openviking/retrieve/intent_analyzer.py"],
+          "keys": ["retrieval.enable_intent", "retrieval.recall_intent_timeout_s", "query_planner"]
+        },
+        {
+          "id": "retriever", "group": "retrieval", "label": "HierarchicalRetriever", "sub": "one global vector search",
+          "summary": "The name is older than the method. The retriever runs one global vector search for each typed query in the permitted scope. It embeds the query, searches the tenant, reranks when it can and applies the threshold.",
+          "files": ["openviking/retrieve/hierarchical_retriever.py", "openviking/storage/viking_fs/_semantic.py"],
+          "keys": ["default_search_mode", "default_search_limit"],
+          "value": "{{search.value}}"
+        },
+        {
+          "id": "rerankc", "group": "retrieval", "label": "Rerank client", "sub": "{{rerank.sub}}",
+          "summary": "RerankClient sorts the candidates again in thinking mode when a rerank section exists. It skips image queries. Providers include volcengine, openai, cohere, litellm and jev.",
+          "files": ["openviking/models/rerank/", "openviking_cli/utils/config/rerank_config.py"],
+          "keys": ["rerank.provider", "rerank.model", "rerank.api_base", "rerank.threshold"],
+          "value": "{{rerank.value}}"
+        },
+        {
+          "id": "sess", "group": "sessions", "label": "Session", "sub": "two-phase commit",
+          "summary": "A Session records messages and usage. A commit archives the messages under a path lock in the first phase and queues the rest. The second phase writes the archive summary and extracts memories.",
+          "files": ["openviking/session/session.py", "openviking/session/archive_store.py"]
+        },
+        {
+          "id": "compressor", "group": "sessions", "label": "SessionCompressorV3", "sub": "extraction driver",
+          "summary": "SessionCompressorV3 drives the long-term memory extraction for a committed archive. It runs ExtractLoop and passes the result to the memory updaters.",
+          "files": ["openviking/session/compressor_v3.py", "openviking/session/__init__.py"],
+          "keys": ["memory.extraction_enabled"]
+        },
+        {
+          "id": "extract", "group": "sessions", "label": "ExtractLoop", "sub": "schema-driven, with the VLM",
+          "summary": "ExtractLoop extracts memories by MemoryType schema in a loop of model calls and tool steps.",
+          "files": ["openviking/session/memory/extract_loop.py"],
+          "keys": ["memory.custom_templates_dir", "memory.extraction_output_format"]
+        },
+        {
+          "id": "updater", "group": "sessions", "label": "MemoryUpdater", "sub": "merge and write patches",
+          "summary": "StreamingMemoryUpdater merges the extracted patches. MemoryUpdater writes and removes memory files through VikingFS and queues their embeddings.",
+          "files": ["openviking/session/memory/memory_updater.py", "openviking/session/memory/streaming_memory_updater.py"]
+        },
+        {
+          "id": "parsers", "group": "ingest", "label": "Parsers", "sub": "PDF, Markdown, HTML, code",
+          "summary": "The parser registry selects a parser for each source type. A parser writes a temporary artifact of files and directories. Model use depends on the parser.",
+          "files": ["openviking/parse/parsers/", "openviking/parse/registry.py", "openviking/parse/parser_router.py"],
+          "keys": ["parsers", "pdf", "code", "markdown", "html"]
+        },
+        {
+          "id": "tree", "group": "ingest", "label": "TreeBuilder", "sub": "target URI",
+          "summary": "TreeBuilder resolves the target URI and keeps references to the temporary artifact. It does not write to storage.",
+          "files": ["openviking/parse/tree_builder.py"]
+        },
+        {
+          "id": "processor", "group": "ingest", "label": "ResourceProcessor", "sub": "parse, commit, summarize",
+          "summary": "ResourceProcessor runs an import job. It parses the source, resolves the URI, commits the files through VikingFS and gives the new tree to the Summarizer.",
+          "files": ["openviking/utils/resource_processor.py", "openviking/utils/media_processor.py", "openviking/utils/summarizer.py"],
+          "keys": ["queue_workers.add_resource"]
+        },
+        {
+          "id": "queues", "group": "ingest", "label": "QueueManager", "sub": "named QueueFS queues",
+          "summary": "QueueManager runs named queues on the QueueFS plugin of RAGFS: AddResource, ExternalParse, Semantic, Embedding, SessionCommit, Reindex, ExternalTask and UserDeletion. Work is complete when no message is pending or in processing.",
+          "files": ["openviking/storage/queuefs/queue_manager.py", "openviking/storage/queuefs/add_resource_processor.py", "openviking/storage/queuefs/session_commit_processor.py", "docs/en/concepts/16-queue-lifecycle.md"],
+          "keys": ["storage.agfs.queuefs.backend", "queue_workers"],
+          "value": "{{queue.value}}"
+        },
+        {
+          "id": "semq", "group": "ingest", "label": "Semantic queue", "sub": "L0 and L1 generation",
+          "summary": "SemanticProcessor reads the Semantic queue. It asks the VLM for the .abstract.md (L0) and .overview.md (L1) files, bottom-up, and then queues the vectors.",
+          "files": ["openviking/storage/queuefs/semantic_queue.py", "openviking/storage/queuefs/semantic_processor.py"],
+          "keys": ["auto_generate_l0", "auto_generate_l1", "semantic", "vlm.max_concurrent"]
+        },
+        {
+          "id": "embq", "group": "ingest", "label": "Embedding queue", "sub": "TextEmbeddingHandler",
+          "summary": "TextEmbeddingHandler reads the Embedding queue. It embeds each text and upserts the vector record into the index.",
+          "files": ["openviking/storage/queuefs/embedding_queue.py", "openviking/storage/collection_schemas.py"],
+          "keys": ["embedding.max_concurrent", "embedding.text_source"]
+        },
+        {
+          "id": "vikingfs", "group": "storage", "label": "VikingFS", "sub": "viking:// URIs",
+          "summary": "VikingFS maps viking:// URIs to RAGFS paths. It also holds the vector store and runs find and search. All services use it.",
+          "files": ["openviking/storage/viking_fs/__init__.py", "openviking/storage/viking_fs/_ops.py", "openviking/storage/viking_fs/_semantic.py"],
+          "keys": ["storage.workspace"]
+        },
+        {
+          "id": "ragfs", "group": "storage", "label": "RAGFS", "sub": "Rust, in process",
+          "summary": "RAGFS is the Rust file system layer that replaces AGFS. The Python binding ragfs_python runs it in the server process. It provides files, QueueFS, path locks, encryption and multi-write backends.",
+          "files": ["crates/ragfs/", "crates/ragfs-python/src/lib.rs", "openviking/pyagfs/__init__.py"],
+          "keys": ["storage.agfs.backend", "storage.agfs.pathlock", "storage.agfs.queuefs", "encryption"],
+          "value": "{{ragfs.value}}"
+        },
+        {
+          "id": "vectordb", "group": "storage", "label": "Vector index", "sub": "{{vectordb.sub}}",
+          "summary": "The vector index holds URIs, vectors, metadata and the text for retrieval, including the abstracts. VikingDBManager reaches it through an adapter: local, cuvs, http, volcengine, vikingdb or opengauss.",
+          "files": ["openviking/storage/vikingdb_manager.py", "openviking/storage/vectordb_adapters/factory.py", "openviking/storage/vectordb/"],
+          "keys": ["storage.vectordb.backend", "storage.vectordb.name", "storage.vectordb.dimension"],
+          "value": "{{vectordb.value}}"
+        },
+        {
+          "id": "embedder", "group": "modelclients", "label": "Embedder", "sub": "{{embedding.model}}",
+          "summary": "The embedder client calls the embedding endpoint for the Embedding queue and for each query. The server resolves the provider for each account.",
+          "files": ["openviking/models/embedder/", "openviking/config/embedding.py"],
+          "keys": ["embedding.dense.provider", "embedding.dense.model", "embedding.dense.api_base", "embedding.dense.dimension"],
+          "value": "{{embedding.value}}"
+        },
+        {
+          "id": "vlmc", "group": "modelclients", "label": "VLM client", "sub": "{{vlm.model}}",
+          "summary": "The VLM client calls the language model for L0 and L1 summaries, intent analysis, archive summaries and memory extraction. The server resolves the provider for each account.",
+          "files": ["openviking/models/vlm/", "openviking/config/vlm.py"],
+          "keys": ["vlm.provider", "vlm.model", "vlm.api_base", "query_planner"],
+          "value": "{{vlm.value}}"
+        }
+      ],
+      "edges": [
+        {"from": "http", "to": "auth", "type": "call", "label": "resolve_identity",
+          "detail": "Each REST request goes through the auth plugin. The result is a request context with the account, the user and the role."},
+        {"from": "mcp", "to": "auth", "type": "call", "label": "same identity check",
+          "detail": "An ASGI middleware calls the same resolve_identity for each MCP request."},
+        {"from": "http", "to": "core", "type": "call", "label": "REST routers",
+          "detail": "The routers under openviking/server/routers/ call the services of the OpenVikingService object."},
+        {"from": "mcp", "to": "core", "type": "call", "label": "MCP tools",
+          "detail": "The 20 MCP tools call the same services as the routers."},
+        {"from": "observ", "to": "ragfs", "type": "call", "label": "/ready probes",
+          "detail": "/ready probes RAGFS, the vector index and the API key manager."},
+        {"from": "auth", "to": "ragfs", "type": "store", "label": "user keys",
+          "detail": "APIKeyManager keeps the account and user key records in RAGFS under the system paths."},
+        {"from": "core", "to": "fs", "type": "call", "label": "files"},
+        {"from": "core", "to": "search", "type": "call", "label": "find, search"},
+        {"from": "core", "to": "session", "type": "call", "label": "sessions"},
+        {"from": "core", "to": "resource", "type": "call", "label": "imports"},
+        {"from": "core", "to": "pack", "type": "call", "label": "ovpack"},
+        {"from": "core", "to": "debug", "type": "call", "label": "observer"},
+        {"from": "core", "to": "others", "type": "call", "label": "wires"},
+        {"from": "search", "to": "intent", "type": "call", "label": "search only",
+          "detail": "VikingFS.search calls IntentAnalyzer when retrieval.enable_intent is on and a session gives context. find never calls it.",
+          "files": ["openviking/storage/viking_fs/_semantic.py"]},
+        {"from": "search", "to": "retriever", "type": "call", "label": "via VikingFS",
+          "detail": "SearchService calls VikingFS.find or VikingFS.search. These call the retriever once for each typed query, at the same time.",
+          "files": ["openviking/storage/viking_fs/_semantic.py"]},
+        {"from": "intent", "to": "vlmc", "type": "model", "label": "query planner",
+          "detail": "The query planner model returns the typed queries. Without a query_planner section, it uses the vlm settings."},
+        {"from": "retriever", "to": "embedder", "type": "model", "label": "embed the query",
+          "detail": "The query is embedded once as a dense vector and, when configured, a sparse vector. Keyword search skips this step."},
+        {"from": "retriever", "to": "vectordb", "type": "store", "label": "search_in_tenant",
+          "detail": "One tenant-scoped vector search for each typed query. With a reranker, it asks for twice the limit."},
+        {"from": "retriever", "to": "rerankc", "type": "call", "label": "thinking mode",
+          "detail": "The retriever reranks the candidates only in thinking mode, with a configured reranker, for text queries."},
+        {"from": "resource", "to": "queues", "type": "queue", "label": "AddResource job",
+          "detail": "The service puts an AddResource or ExternalParse job on QueueFS. Without a source plan, the import runs directly."},
+        {"from": "resource", "to": "tasks", "type": "call", "label": "wait=true",
+          "detail": "With wait=true, the request waits on the task of the job."},
+        {"from": "queues", "to": "processor", "type": "queue", "label": "AddResourceProcessor",
+          "detail": "AddResourceProcessor takes the job and calls ResourceService.execute_add_resource_job, which runs ResourceProcessor."},
+        {"from": "processor", "to": "parsers", "type": "call", "label": "parse",
+          "detail": "UnifiedResourceProcessor selects a parser through the registry. The parser writes a temporary artifact."},
+        {"from": "processor", "to": "tree", "type": "call", "label": "finalize URI",
+          "detail": "TreeBuilder.finalize_from_temp resolves the final URI metadata. It writes nothing."},
+        {"from": "processor", "to": "vikingfs", "type": "store", "label": "commit files",
+          "detail": "The directory artifact goes into RAGFS through VikingFS under the target URI. This is the L2 content."},
+        {"from": "processor", "to": "semq", "type": "queue", "label": "SemanticMsg",
+          "detail": "Summarizer puts a SemanticMsg on the Semantic queue. Planned direct vector actions go to the Embedding queue."},
+        {"from": "semq", "to": "vlmc", "type": "model", "label": "L0 + L1 text",
+          "detail": "SemanticProcessor asks the VLM for the abstract and the overview of each file and directory, bottom-up."},
+        {"from": "semq", "to": "vikingfs", "type": "store", "label": "write L0/L1",
+          "detail": "The .abstract.md and .overview.md files go next to the content."},
+        {"from": "semq", "to": "embq", "type": "queue", "label": "EmbeddingMsg",
+          "detail": "vectorize_file and vectorize_directory_meta put an EmbeddingMsg on the Embedding queue."},
+        {"from": "embq", "to": "embedder", "type": "model", "label": "embed text",
+          "detail": "TextEmbeddingHandler embeds the text of each message."},
+        {"from": "embq", "to": "vectordb", "type": "store", "label": "upsert",
+          "detail": "VikingDBManager.upsert writes the record: URI, vector, metadata and text."},
+        {"from": "session", "to": "sess", "type": "call", "label": "commit_async",
+          "detail": "SessionService.commit_async starts the first phase of the commit."},
+        {"from": "sess", "to": "vikingfs", "type": "store", "label": "lock, archive, markers",
+          "detail": "The first phase takes a path lock, splits archived and retained messages and writes the archive and its phase markers."},
+        {"from": "sess", "to": "queues", "type": "queue", "label": "SessionCommit",
+          "detail": "The first phase puts a SessionCommit message on the queue and returns."},
+        {"from": "queues", "to": "sess", "type": "queue", "label": "second phase",
+          "detail": "SessionCommitProcessor calls Session.resume_queued_commit. The phase markers and QueueFS make the commit safe across a restart."},
+        {"from": "sess", "to": "tasks", "type": "call", "label": "commit task",
+          "detail": "The commit creates a task, so a caller can follow its state."},
+        {"from": "sess", "to": "vlmc", "type": "model", "label": "archive summary",
+          "detail": "The second phase asks the VLM for the L0 and L1 summary of the archive."},
+        {"from": "sess", "to": "compressor", "type": "call", "label": "extract memories",
+          "detail": "_run_memory_extraction calls SessionCompressorV3.extract_long_term_memories."},
+        {"from": "compressor", "to": "extract", "type": "call", "label": "ExtractLoop.run"},
+        {"from": "extract", "to": "vlmc", "type": "model", "label": "extraction",
+          "detail": "ExtractLoop sends the messages and the MemoryType schemas to the VLM and reads back memory operations."},
+        {"from": "compressor", "to": "updater", "type": "call", "label": "patches",
+          "detail": "The compressor submits the operations to StreamingMemoryUpdater, which merges them and calls MemoryUpdater."},
+        {"from": "updater", "to": "vikingfs", "type": "store", "label": "write memory files",
+          "detail": "MemoryUpdater writes and removes memory files through VikingFS."},
+        {"from": "updater", "to": "embq", "type": "queue", "label": "queue embeddings",
+          "detail": "MemoryUpdater calls enqueue_embedding_msg. The vectors are written asynchronously, not directly."},
+        {"from": "vikingfs", "to": "ragfs", "type": "store", "label": "ragfs_python binding",
+          "detail": "VikingFS calls the Rust RAGFS binding in the same process."},
+        {"from": "vikingfs", "to": "vectordb", "type": "store", "label": "vector records",
+          "detail": "VikingFS keeps the vector records in step with the files, for example when it removes a URI."},
+        {"from": "queues", "to": "ragfs", "type": "store", "label": "QueueFS at /queue",
+          "detail": "The queues are a RAGFS plugin mounted at /queue. The backend is memory, sqlite or cache."},
+        {"from": "fs", "to": "vikingfs", "type": "call", "label": "file operations"},
+        {"from": "pack", "to": "vikingfs", "type": "call", "label": "ovpack read + write"},
+        {"from": "debug", "to": "queues", "type": "call", "label": "observer",
+          "detail": "The observer reads the queue status and also the state of the vector index, RAGFS and the model clients."}
+      ]
+    },
+    {
+      "id": "flows",
+      "type": "flow",
+      "base": "internals",
+      "title": "Data flows",
+      "short": "Flows",
+      "desc": "Three flows on the nodes of the server internals: add context, retrieve context and session commit. Each step names the code that runs.",
+      "flows": [
+        {
+          "id": "add", "title": "Add context",
+          "summary": "A resource goes from the request to RAGFS. Asynchronous queues then add the L0 and L1 summaries and the vectors.",
+          "steps": [
+            {"node": "http", "title": "Request", "label": "POST /api/v1/resources", "text": "A client sends POST /api/v1/resources, or calls the MCP tool add_resource."},
+            {"node": "resource", "title": "Plan the import", "label": "add_resource", "text": "ResourceService reserves the target URI with a path lock and makes a source plan."},
+            {"node": "queues", "title": "Queue the job", "label": "AddResource job", "text": "The service puts an AddResource or ExternalParse job on QueueFS. With wait=true, the request waits on the task."},
+            {"node": "processor", "title": "Run the job", "label": "AddResourceProcessor", "text": "AddResourceProcessor takes the job and runs ResourceProcessor.process_resource."},
+            {"node": "parsers", "title": "Parse", "label": "parse", "text": "The parser registry selects a parser. The parser writes a temporary artifact of files and directories."},
+            {"node": "tree", "title": "Resolve the URI", "label": "finalize_from_temp", "text": "TreeBuilder resolves the final URI metadata. It writes nothing."},
+            {"node": "vikingfs", "title": "Commit the files", "label": "commit", "text": "ResourceProcessor commits the directory artifact through VikingFS."},
+            {"node": "ragfs", "title": "Store the content", "label": "RAGFS write", "text": "RAGFS stores the full content (L2) in the workspace."},
+            {"node": "semq", "title": "Queue the summaries", "label": "SemanticMsg", "text": "Summarizer puts a SemanticMsg on the Semantic queue."},
+            {"node": "vlmc", "title": "Write L0 and L1", "label": "VLM", "text": "SemanticProcessor asks the VLM for .abstract.md and .overview.md, bottom-up, and writes them through VikingFS."},
+            {"node": "embq", "title": "Queue the vectors", "label": "EmbeddingMsg", "text": "SemanticProcessor puts an EmbeddingMsg on the Embedding queue for each file and directory."},
+            {"node": "embedder", "title": "Embed", "label": "embed text", "text": "TextEmbeddingHandler embeds the text."},
+            {"node": "vectordb", "title": "Index", "label": "upsert", "text": "VikingDBManager upserts the record. The resource is complete when no queue message is pending or in processing."}
+          ]
+        },
+        {
+          "id": "retrieve", "title": "Retrieve context",
+          "summary": "A query goes to one global vector search for each typed query, with an optional rerank. Only search can add intent analysis.",
+          "steps": [
+            {"node": "http", "title": "Request", "label": "POST /api/v1/search/find", "text": "A client sends POST /api/v1/search/find or /api/v1/search/search, or calls the MCP tool find or search."},
+            {"node": "search", "title": "SearchService", "label": "find / search", "text": "SearchService calls VikingFS.find or VikingFS.search."},
+            {"node": "intent", "title": "Intent analysis", "label": "search only", "text": "Only search does this step, and only when retrieval.enable_intent is on and a session gives context. find skips it."},
+            {"node": "vlmc", "title": "Plan the queries", "label": "query planner", "text": "The query planner model returns zero to five typed queries. Without this step, the raw query is the only query."},
+            {"node": "retriever", "title": "Retrieve each query", "label": "retrieve", "text": "The retriever runs once for each typed query, at the same time."},
+            {"node": "embedder", "title": "Embed the query", "label": "embed query", "text": "The query is embedded once. Keyword search skips this step."},
+            {"node": "vectordb", "title": "Vector search", "label": "search_in_tenant", "text": "One global search in the scope of the tenant. There is no recursive walk of directories."},
+            {"node": "rerankc", "title": "Rerank", "label": "optional", "text": "In thinking mode with a configured reranker, the client sorts the candidates again. Then the threshold applies."},
+            {"node": "search", "title": "Results", "label": "FindResult", "text": "The result groups memories, resources and skills, with the query plan."}
+          ]
+        },
+        {
+          "id": "commit", "title": "Session commit",
+          "summary": "A commit archives the messages in the first phase. A queued second phase summarizes the archive and extracts memories.",
+          "steps": [
+            {"node": "http", "title": "Request", "label": "POST .../commit", "text": "A client sends POST /api/v1/sessions/{id}/commit."},
+            {"node": "session", "title": "SessionService", "label": "commit_async", "text": "SessionService.commit_async calls Session.commit_async."},
+            {"node": "sess", "title": "First phase", "label": "lock + split", "text": "The session takes a path lock and splits the messages into archived and retained messages."},
+            {"node": "vikingfs", "title": "Write the archive", "label": "archive + markers", "text": "ArchiveStore writes the archive and the phase marker through VikingFS."},
+            {"node": "queues", "title": "Queue the second phase", "label": "SessionCommit", "text": "The session puts a SessionCommit message on the queue and creates a task."},
+            {"node": "sess", "title": "Second phase", "label": "resume_queued_commit", "text": "SessionCommitProcessor calls Session.resume_queued_commit."},
+            {"node": "vlmc", "title": "Archive summary", "label": "L0 + L1", "text": "The VLM writes the L0 and L1 summary of the archive."},
+            {"node": "compressor", "title": "Start extraction", "label": "extract_long_term_memories", "text": "SessionCompressorV3 starts the long-term memory extraction."},
+            {"node": "extract", "title": "Extract memories", "label": "ExtractLoop.run", "text": "ExtractLoop calls the VLM with the MemoryType schemas and reads back memory operations."},
+            {"node": "updater", "title": "Merge patches", "label": "StreamingMemoryUpdater", "text": "StreamingMemoryUpdater merges the patches. MemoryUpdater applies them."},
+            {"node": "vikingfs", "title": "Write memory files", "label": "write_file / rm", "text": "MemoryUpdater writes and removes memory files through VikingFS."},
+            {"node": "embq", "title": "Queue the vectors", "label": "enqueue_embedding_msg", "text": "MemoryUpdater queues the embeddings. The vectors are written asynchronously."},
+            {"node": "embedder", "title": "Embed", "label": "embed text", "text": "TextEmbeddingHandler embeds each memory text."},
+            {"node": "vectordb", "title": "Index", "label": "upsert", "text": "VikingDBManager upserts the memory records."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "repository",
+      "title": "Repository, release and image",
+      "short": "Repository",
+      "desc": "The Git refs from the upstream tag to the public release, with the checks on each edge, and the image build from scripts/build.sh to the running container.",
+      "layout": {
+        "rows": [
+          [["upstream", "automation"], ["work"], ["integration"], ["release"]],
+          [["base"], ["build"], ["targets"], ["run"]]
+        ],
+        "col_gap": 140
+      },
+      "nodes": [
+        {
+          "id": "up_repo", "group": "upstream", "label": "Upstream repository", "sub": "remote upstream, fetch only",
+          "summary": "The upstream remote names the upstream OpenViking repository. Push is disabled, and the default refspec fetches nothing. scripts/setup-remotes.sh creates the remote.",
+          "files": ["scripts/setup-remotes.sh", "docs/remotes.md"],
+          "value": "https://github.com/volcengine/OpenViking"
+        },
+        {
+          "id": "up_tag", "group": "upstream", "label": "Upstream tag", "sub": "refs/upstream/tags/<tag>",
+          "summary": "scripts/fetch-upstream.sh fetches one release tag with its history into refs/upstream/tags/. Upstream tags never enter refs/tags/. The tag line of scripts/upstream-base records the current base.",
+          "files": ["scripts/fetch-upstream.sh", "scripts/upstream-base", "docs/branches.md"],
+          "value": "{{repo.upstream_tag}}"
+        },
+        {
+          "id": "upd", "group": "automation", "label": "Development updates", "sub": "daily detect and qualify",
+          "summary": "The update workflow detects a new upstream tag, base image digest, scanner or uv version. It qualifies at most one candidate in a separate clone and opens a pull request to local-dev. It never promotes.",
+          "files": [".gitea/workflows/upstream-update.yml", "scripts/upstream-update.py", "scripts/update-propose.py", "docs/update.md"]
+        },
+        {
+          "id": "sync", "group": "work", "label": "sync/* branches", "sub": "one upstream tag each",
+          "summary": "A sync branch merges one upstream tag into local-dev. It applies the deletions of scripts/upstream-removed and updates scripts/upstream-base.",
+          "files": ["scripts/upstream-removed", "scripts/upstream-base", "docs/branches.md"]
+        },
+        {
+          "id": "topic", "group": "work", "label": "topic/* branches", "sub": "one change each",
+          "summary": "A topic branch holds one change. It starts at local-dev and merges into local-dev after review. The update workflow also makes topic/pin-<kind> branches for pin updates.",
+          "files": ["docs/branches.md"]
+        },
+        {
+          "id": "localdev", "group": "integration", "label": "local-dev", "sub": "private integration branch",
+          "summary": "local-dev holds upstream plus the local changes. Its history can hold host values, so it never goes to a shared server. Topic and sync branches start here and merge back.",
+          "files": ["docs/branches.md"]
+        },
+        {
+          "id": "origin", "group": "integration", "label": "origin remote", "sub": "private Git server",
+          "summary": "origin is the private server of the clone. It receives every branch, but no upstream tag. Each push names its refs; never --tags or --mirror.",
+          "files": ["docs/remotes.md"],
+          "value": "{{repo.origin}}"
+        },
+        {
+          "id": "portable", "group": "release", "label": "portable", "sub": "orphan history of promotions",
+          "summary": "portable shares no commit with local-dev or upstream. Each promotion adds one commit with the tree of local-dev and a generic identity. Only portable and its tags leave the host.",
+          "files": ["scripts/promote.sh", "docs/branches.md"],
+          "value": "{{repo.portable}}"
+        },
+        {
+          "id": "ptag", "group": "release", "label": "portable-v* tags", "sub": "annotated release tags",
+          "summary": "promote.sh --version X.Y.Z makes the annotated tag portable-vX.Y.Z on the new portable commit. Release images build from such a tag only.",
+          "files": ["scripts/promote.sh", "docs/branches.md", "docs/image.md"]
+        },
+        {
+          "id": "shared", "group": "release", "label": "shared remote", "sub": "public release repository",
+          "summary": "shared points to the public release repository, for example on GitHub. It receives only portable and the portable-v* tags. A checks workflow runs there on each push.",
+          "files": ["scripts/setup-remotes.sh", "docs/remotes.md", ".github/workflows/checks.yml"],
+          "keys": ["SHARED_URL", "SHARED_REMOTE"],
+          "value": "{{repo.shared}}"
+        },
+        {
+          "id": "b_rust", "group": "base", "label": "Rust image", "sub": "RUST_IMAGE @ RUST_DIGEST",
+          "summary": "The base of the rust-toolchain stage. py-builder copies cargo and rustup from it to build the ov CLI and RAGFS.",
+          "files": ["Dockerfile", "docker-bake.hcl"],
+          "keys": ["RUST_IMAGE", "RUST_DIGEST", "REGISTRY_PREFIX"],
+          "value": "{{base.rust}}"
+        },
+        {
+          "id": "b_node", "group": "base", "label": "Node image", "sub": "NODE_IMAGE @ NODE_DIGEST",
+          "summary": "The base of the web-studio-builder stage. The stage runs npm ci and builds the Studio bundle with the base path /studio/.",
+          "files": ["Dockerfile", "docker-bake.hcl"],
+          "keys": ["NODE_IMAGE", "NODE_DIGEST", "REGISTRY_PREFIX"],
+          "value": "{{base.node}}"
+        },
+        {
+          "id": "b_python", "group": "base", "label": "Python image", "sub": "PYTHON_IMAGE @ PYTHON_DIGEST",
+          "summary": "The base of the py-builder stage, which builds /app/.venv with uv pinned by hash. The runtime stage uses the same image.",
+          "files": ["Dockerfile", "docker-bake.hcl"],
+          "keys": ["PYTHON_IMAGE", "PYTHON_DIGEST", "REGISTRY_PREFIX"],
+          "value": "{{base.python}}"
+        },
+        {
+          "id": "buildsh", "group": "build", "label": "scripts/build.sh", "sub": "versions, labels, pin check",
+          "summary": "build.sh computes the version values from Git and runs docker buildx bake. It stops when a Dockerfile pin differs from docker-bake.hcl. BUILD_ENGINE=podman supports gateway and smoke only.",
+          "files": ["scripts/build.sh", "docs/image.md"],
+          "keys": ["OPENVIKING_VERSION", "UPSTREAM_VERSION", "PORTABLE_VERSION", "REVISION", "SOURCE_DATE_EPOCH", "SOURCE_URL", "BUILD_ENGINE"]
+        },
+        {
+          "id": "bake", "group": "build", "label": "docker-bake.hcl", "sub": "variables and targets",
+          "summary": "The bake file holds the variables, the base image pins and the targets. The target image builds the Dockerfile, and the other targets use it.",
+          "files": ["docker-bake.hcl"],
+          "keys": ["GATEWAY_IMAGE", "RELEASE_IMAGE", "RELEASE_PLATFORMS", "UV_LOCK_STRATEGY", "PROVENANCE"]
+        },
+        {
+          "id": "dockerfile", "group": "build", "label": "Dockerfile", "sub": "four stages",
+          "summary": "The Dockerfile has the stages rust-toolchain, web-studio-builder, py-builder and the runtime stage. The frontend syntax image and each base image are pinned by digest.",
+          "files": ["Dockerfile", "deploy/docker/openviking-entrypoint.sh"]
+        },
+        {
+          "id": "labels", "group": "build", "label": "OCI labels", "sub": "source, revision, version",
+          "summary": "The target image sets the labels source, revision, version, created, title and licenses. The version label is <upstream>-p<portable>. The runtime stage adds the base image name and digest.",
+          "files": ["docker-bake.hcl", "Dockerfile"],
+          "keys": ["SOURCE_URL", "REVISION", "UPSTREAM_VERSION", "PORTABLE_VERSION", "SOURCE_DATE_EPOCH"],
+          "value": "{{image.labels}}"
+        },
+        {
+          "id": "t_smoke", "group": "targets", "label": "smoke", "sub": "import check, no output",
+          "summary": "smoke imports the package and finds ov, openviking-server and openviking-entrypoint in the image. The output is cache only.",
+          "files": ["docker-bake.hcl"]
+        },
+        {
+          "id": "t_gateway", "group": "targets", "label": "gateway", "sub": "loads openviking:local",
+          "summary": "gateway runs smoke first and then loads the image into the local store as GATEWAY_IMAGE. The name is a bake target; it does not start the OpenViking Gateway.",
+          "files": ["docker-bake.hcl", "scripts/build.sh"],
+          "keys": ["GATEWAY_IMAGE"]
+        },
+        {
+          "id": "t_test", "group": "targets", "label": "test", "sub": "upstream lite tests",
+          "summary": "test runs four upstream vector database test files inside the image with the network off. It adds only pytest, pytest-asyncio and numpy, with the hashes of uv.lock.",
+          "files": ["docker-bake.hcl", "uv.lock"]
+        },
+        {
+          "id": "t_release", "group": "targets", "label": "release", "sub": "multi-platform, clean tree",
+          "summary": "release builds for RELEASE_PLATFORMS from a clean tree. It needs exactly one of --oci FILE or --push. The tag is RELEASE_IMAGE:<upstream>-p<portable>.",
+          "files": ["docker-bake.hcl", "scripts/build.sh", "docs/image.md"],
+          "keys": ["RELEASE_IMAGE", "RELEASE_PLATFORMS", "RELEASE_OCI", "RELEASE_PUSH", "PROVENANCE"]
+        },
+        {
+          "id": "img", "group": "run", "label": "Local image", "sub": "{{runtime.image_short}}",
+          "summary": "The image in the local Docker store that OPENVIKING_IMAGE names. Compose never pulls it. Record its ID and labels before an update, for a rollback.",
+          "files": ["docs/operations.md", ".env.example"],
+          "keys": ["OPENVIKING_IMAGE"],
+          "value": "{{runtime.image}}"
+        },
+        {
+          "id": "composefile", "group": "run", "label": "compose.yaml", "sub": "pull_policy: never",
+          "summary": "compose.yaml runs the image with --with-bot, the loopback port, the bind mount and the health check. It has no build section, so Compose cannot rebuild the image.",
+          "files": ["compose.yaml", "tests/test_compose.sh"]
+        },
+        {
+          "id": "override", "group": "run", "label": ".local/compose.host.yaml", "sub": "host override, not tracked",
+          "summary": "The host override adds a container name, the public URL and the external ingress network. COMPOSE_FILE in .env loads it after compose.yaml.",
+          "files": ["docs/host-configuration.md"],
+          "keys": ["COMPOSE_FILE", "container_name", "OPENVIKING_PUBLIC_BASE_URL"],
+          "value": "{{override.value}}"
+        },
+        {
+          "id": "container", "group": "run", "label": "openviking container", "sub": "{{runtime.container_name}}",
+          "summary": "The running service. The runtime view shows its processes, files and model endpoints.",
+          "files": ["compose.yaml"],
+          "value": "{{runtime.engine_value}}",
+          "drill": {"view": "runtime", "node": "server", "label": "Open the runtime view"}
+        }
+      ],
+      "edges": [
+        {"from": "up_repo", "to": "up_tag", "type": "git", "label": "fetch-upstream.sh <tag>",
+          "detail": "The script fetches one tag with its full history into refs/upstream/tags/<tag>.",
+          "checks": ["sh tests/test_setup_remotes.sh"], "files": ["scripts/fetch-upstream.sh"]},
+        {"from": "up_tag", "to": "sync", "type": "git", "label": "git merge --no-ff",
+          "detail": "On sync/<tag>: git merge --no-ff --no-commit refs/upstream/tags/<tag>. The merge applies scripts/upstream-removed and replaces scripts/upstream-base with the output of the baseline mode of the scan.",
+          "checks": ["sh scripts/scan.sh baseline", "scripts/upstream-removed deletions"]},
+        {"from": "upd", "to": "sync", "type": "ci", "label": "qualified branch + PR",
+          "detail": "upstream-update.py qualify merges the tag in a clone outside every checkout. Only a passed run pushes one explicit branch and opens a pull request to local-dev.",
+          "checks": ["tree scan and public check", "shell test suites and unit tests", "sh scripts/build.sh test", "gateway build, image and Compose tests", "scan of the added image layers"]},
+        {"from": "upd", "to": "topic", "type": "ci", "label": "topic/pin-<kind> + PR",
+          "detail": "A new base image digest, scanner or uv version becomes a topic/pin-<kind> branch with the same qualification."},
+        {"from": "localdev", "to": "sync", "type": "git", "label": "branch",
+          "detail": "Each sync branch starts at local-dev."},
+        {"from": "localdev", "to": "topic", "type": "git", "label": "branch",
+          "detail": "Each topic branch starts at local-dev."},
+        {"from": "sync", "to": "localdev", "type": "git", "label": "merge after review",
+          "detail": "The reviewed sync branch merges into local-dev. The development checks workflow runs on the push and the pull request.",
+          "checks": ["pre-merge-commit hook: sh scripts/scan.sh staged", "sh scripts/scan.sh --level fail tree", "sh scripts/public-check.sh", "Development checks workflow: .gitea/workflows/checks.yml"]},
+        {"from": "topic", "to": "localdev", "type": "git", "label": "merge after review",
+          "detail": "The reviewed topic branch merges into local-dev.",
+          "checks": ["pre-commit hook: sh scripts/scan.sh staged", "sh scripts/scan.sh --level fail tree", "sh scripts/public-check.sh", "the shell tests of the changed area", "Development checks workflow: .gitea/workflows/checks.yml"]},
+        {"from": "localdev", "to": "origin", "type": "push", "label": "push explicit refs",
+          "detail": "The pre-push hook scans the history of each pushed ref without the upstream base commits. origin accepts every branch; upstream tags stay local.",
+          "checks": ["pre-push hook: sh scripts/scan.sh history"]},
+        {"from": "localdev", "to": "portable", "type": "git", "label": "scripts/promote.sh --version",
+          "detail": "promote.sh makes a commit with git commit-tree: the tree of local-dev, the previous portable tip as the only parent, and a generic identity. The refs move only after all checks pass. Without options, it is a dry run. README.md asks for separate approval before each promotion.",
+          "checks": ["sh scripts/scan.sh --level fail tree", "sh scripts/public-check.sh", "public check of the local-dev source object", "fail-level history scan of the new range", "sh tests/test_promotion.sh"]},
+        {"from": "portable", "to": "ptag", "type": "git", "label": "annotated tag",
+          "detail": "The same promote.sh run makes portable-vX.Y.Z on the new commit. The version must increase."},
+        {"from": "portable", "to": "shared", "type": "push", "label": "promote.sh --push shared",
+          "detail": "promote.sh --tag portable-vX.Y.Z --push shared pushes two explicit refspecs with pinned object IDs. It never forces, the pre-push hook still runs, and an audit of the remote refs follows.",
+          "checks": ["pre-push guard: only portable and portable-v*", "sh scripts/scan.sh history at level fail", "sh scripts/public-check.sh --ref <object>", "Portable checks workflow: .github/workflows/checks.yml"]},
+        {"from": "ptag", "to": "shared", "type": "push", "label": "tag push",
+          "detail": "The tag goes in the same push as portable."},
+        {"from": "ptag", "to": "buildsh", "type": "build", "label": "release build from the tag",
+          "detail": "Release images build from a portable-v* tag only. On portable, build.sh reads the upstream version from scripts/upstream-base."},
+        {"from": "localdev", "to": "buildsh", "type": "build", "label": "gateway build, clean tree",
+          "detail": "A local gateway build runs from a clean worktree or a copy, never from a checkout that holds live data."},
+        {"from": "buildsh", "to": "bake", "type": "build", "label": "docker buildx bake",
+          "detail": "build.sh exports the version values and calls docker buildx bake with one target.",
+          "checks": ["pin check: Dockerfile ARG equals the bake default", "sh tests/test_build_version.sh"]},
+        {"from": "bake", "to": "dockerfile", "type": "build", "label": "target image",
+          "detail": "The target image passes the version, the pins and SOURCE_DATE_EPOCH to the Dockerfile as build arguments."},
+        {"from": "b_rust", "to": "dockerfile", "type": "build", "label": "rust-toolchain"},
+        {"from": "b_node", "to": "dockerfile", "type": "build", "label": "web-studio-builder"},
+        {"from": "b_python", "to": "dockerfile", "type": "build", "label": "py-builder + runtime"},
+        {"from": "bake", "to": "labels", "type": "build", "label": "labels of target image"},
+        {"from": "bake", "to": "t_smoke", "type": "build", "label": "FROM image"},
+        {"from": "bake", "to": "t_gateway", "type": "build", "label": "inherits image"},
+        {"from": "bake", "to": "t_test", "type": "build", "label": "FROM image + builder"},
+        {"from": "bake", "to": "t_release", "type": "build", "label": "inherits image"},
+        {"from": "t_gateway", "to": "img", "type": "run", "label": "type=docker load",
+          "detail": "The image goes into the local store with the GATEWAY_IMAGE tag.",
+          "checks": ["sh tests/test_image.sh <image>"]},
+        {"from": "t_release", "to": "img", "type": "run", "label": "OCI archive or push",
+          "detail": "release writes an OCI archive with --oci FILE, or pushes with --push. A host loads the archive, or pulls the digest by hand."},
+        {"from": "labels", "to": "img", "type": "build", "label": "labels on the image"},
+        {"from": "img", "to": "container", "type": "run", "label": "OPENVIKING_IMAGE",
+          "detail": "The engine runs the image that OPENVIKING_IMAGE names. Compose never pulls."},
+        {"from": "composefile", "to": "container", "type": "run", "label": "docker compose up -d",
+          "detail": "Compose creates or replaces the service container.",
+          "checks": ["docker compose config --quiet", "sh tests/test_compose.sh"]},
+        {"from": "override", "to": "composefile", "type": "file", "label": "COMPOSE_FILE",
+          "detail": "COMPOSE_FILE=compose.yaml:.local/compose.host.yaml merges the host override after compose.yaml."}
+      ]
+    }
+  ],
+  "tour": [
+    {"view": "runtime", "title": "The bird's-eye view", "text": "Each view is one graph. Select a node to open its details on the right. Select an edge to see what passes over it. The tabs at the top change the view."},
+    {"view": "runtime", "node": "ingress", "title": "How a request arrives", "text": "Remote clients reach the server through the ingress proxy and an external Docker network. Clients on the host can use the published loopback port."},
+    {"view": "runtime", "node": "server", "title": "One container, two processes", "text": "openviking-entrypoint starts openviking-server, and the server starts VikingBot as a child process. Double-click the node, or use the button in the panel, to drill down."},
+    {"view": "runtime", "node": "state", "title": "All state in one bind mount", "text": "ov.conf and the stored context live in ./data on the host. Back it up before each image change."},
+    {"view": "internals", "node": "core", "title": "The service layer", "text": "The REST routers and the 20 MCP tools call one OpenVikingService object. It holds the services for files, search, sessions, resources, packs and debug."},
+    {"view": "internals", "node": "vikingfs", "title": "Content and index", "text": "VikingFS maps viking:// URIs to RAGFS files. The vector index holds the vectors and the abstracts for retrieval."},
+    {"view": "flows", "flow": "add", "step": 0, "title": "Follow a data flow", "text": "The flow view marks the nodes of one flow, step by step. Use Next, the step list or the arrow keys."},
+    {"view": "repository", "node": "portable", "title": "From private branch to public release", "text": "Changes merge into local-dev. scripts/promote.sh copies its tree to portable after the checks on the edge pass. Select an edge to see its checks."},
+    {"view": "repository", "node": "buildsh", "title": "The image build", "text": "scripts/build.sh computes the version labels and runs a bake target. Compose runs the local image and never pulls."}
+  ]
+}

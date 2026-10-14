@@ -97,7 +97,7 @@ The `Dockerfile` has four stages. Only the last stage is in the image.
 | --- | --- | --- |
 | `rust-toolchain` | `RUST_IMAGE` (`rust:1.91.1-trixie`) | The Rust toolchain. The stage `py-builder` copies `/usr/local/cargo` and `/usr/local/rustup` from it. |
 | `web-studio-builder` | `NODE_IMAGE` (`node:24-trixie-slim`) | The Web Studio bundle: `npm ci`, then `npm run build -- --base=/studio/` in `web-studio/`. |
-| `py-builder` | `PYTHON_IMAGE` (`python:3.13-slim-trixie`) | The virtual environment `/app/.venv`. `uv sync --locked` installs the project with the extras `bot`, `gemini` and `opengauss`. The install compiles the Rust CLI and the native extensions. |
+| `py-builder` | `PYTHON_IMAGE` (`python:3.13-slim-trixie`) | The virtual environment `/app/.venv`. `uv sync --locked` installs the project with the extras `bot`, `gemini`, `opengauss` and `gateway`. The install compiles the Rust CLI and the native extensions. |
 | Runtime (the last stage, no name) | `PYTHON_IMAGE` | The Debian packages `ca-certificates`, `curl`, `git` and `libstdc++6`, the directory `/app/.venv` and the two files of `deploy/docker/`. |
 
 Each base image is pinned by digest in the `ARG` lines at the top of the `Dockerfile`.
@@ -113,7 +113,12 @@ The commands in the image:
 | `openviking-pending-health` | `deploy/docker/pending_health_server.py` | A small HTTP server that answers each request with status 503 while `ov.conf` is absent. |
 | `openviking-server` | `[project.scripts]` in `pyproject.toml` | The HTTP server: the API, the Web Studio at `/studio`, the MCP (Model Context Protocol) endpoint at `/mcp` and `/health`. |
 | `vikingbot` | `[project.scripts]` in `pyproject.toml` | VikingBot. The server starts `vikingbot gateway` as a child process. |
+| `openviking-gateway` | `[project.scripts]` in `pyproject.toml` | The separate memory proxy for model clients. The kit does not start it. |
 | `ov`, `openviking` | `[project.scripts]` in `pyproject.toml` | The command-line client, a Rust program in the Python package. |
+
+OpenViking Gateway uses port `1935` by default, but `compose.yaml` does not start or publish it.
+It is separate from VikingBot Gateway and the bake target `gateway`.
+See [OpenViking Gateway](docs/image.md#openviking-gateway) for the kit's scope and the upstream requirements.
 
 ### Processes, ports and configuration files
 
@@ -178,7 +183,10 @@ It also needs disk space for the builder. [Image build](docs/image.md) gives the
 
 Run each command of steps 2 to 14 in the root of the clone.
 
-Warning: `docker compose up` in a clone that holds live `data/` replaces the live container. Use a new clone for a test.
+Warning: `docker compose up` in a clone that holds live `data/` replaces the live container.
+
+Use a new clone with its own Compose project name (`COMPOSE_PROJECT_NAME=<name>`), image tag (`OPENVIKING_IMAGE`) and free port (`OPENVIKING_PORT`).
+Alternatively, `OPENVIKING_IMAGE=<test-image> sh tests/test_compose.sh` isolates the project, port and state directory.
 
 ### Step 1. Clone the repository
 
@@ -409,6 +417,7 @@ openviking build: target=gateway version=<upstream>+p<portable> label=<upstream>
 ```
 
 Then `docker image inspect --format '{{.Id}}' openviking:local` prints the ID of the image.
+With `BUILD_ENGINE=podman`, use `podman image inspect --format '{{.Id}}' openviking:local`.
 
 <details>
 <summary>Details: what <code>scripts/build.sh</code> does</summary>
@@ -891,9 +900,9 @@ The steps are the same as on Linux. The table gives the differences.
 | Prerequisites | Create the virtual machine (VM) with `podman machine init --cpus 4 --memory 8192 --disk-size 50`. Start it with `podman machine start`. The example allocates 4 CPUs, 8 GiB of memory and a 50 GiB disk. Not verified: this allocation and these commands on a Mac. |
 | Prerequisites | Set `PODMAN_COMPOSE_PROVIDER` to `$(brew --prefix)/bin/docker-compose`. Podman passes the Compose arguments and selects its socket for the provider. `podman compose` needs no `DOCKER_HOST` setting. Set `DOCKER_HOST` to the Podman socket for the scripts that call `docker`. [Mac](docs/mac.md#install-and-start-podman) gives the socket command and the Docker Compose plugin setting. Not verified: these settings on a Mac. |
 | 1 | Keep the checkout and `$TMPDIR` in shared paths. The Podman macOS defaults share `/Users`, `/private` and `/var/folders` at the same paths in the VM. Not verified: these shares on a Mac. |
-| 7 | Build with `BUILD_ENGINE=podman sh scripts/build.sh gateway`. The build uses native `linux/arm64`. The `test` and `release` targets need BuildKit and run on Linux. `BUILD_ENGINE=podman` refuses both targets. Not verified: an `arm64` build, the `arm64` image at run time or the scripts with macOS BSD tools. |
-| 8 to 10 | Use `podman compose config --quiet`, `podman compose up -d` and `podman compose ps`, with the same arguments. Keep `pull_policy: never` and the health check of `compose.yaml`. Not verified: these commands, the pull policy or the health check through the Podman socket. |
-| 12 | Run `sh tests/test_image.sh openviking:local` with the Docker CLI against the Podman socket. `tests/test_compose.sh` also needs the Docker Compose plugin. Not verified: either test with Podman. |
+| 7 | Build with `BUILD_ENGINE=podman sh scripts/build.sh gateway`. The build uses native `linux/arm64`. The `test` and `release` targets need BuildKit and run on Linux. `BUILD_ENGINE=podman` refuses both targets. The Podman path passed on Linux `amd64` with Podman 5.8.7; this is not a Mac result. Not verified: an `arm64` build, the `arm64` image at run time or the scripts with macOS BSD tools. |
+| 8 to 10 | Use `podman compose config --quiet`, `podman compose up -d` and `podman compose ps`, with the same arguments. Keep `pull_policy: never` and the health check of `compose.yaml`. These commands and `pull_policy: never` passed on Linux `amd64` with Podman 5.8.7. Not verified: an automatic health check run with Podman, or these commands on a Mac. |
+| 12 | Run `sh tests/test_image.sh openviking:local` with the Docker CLI against the Podman socket. `tests/test_compose.sh` also needs the Docker Compose plugin. `tests/test_image.sh` passed on Linux `amd64` with Podman 5.8.7. Not verified: `tests/test_compose.sh` with Podman, or either test on a Mac. |
 | 13 and 14 | Use `podman pull` with the scanner reference of step 13. Run `SCAN_ENGINE=docker sh scripts/scan.sh tree`. The scanner uses the Docker CLI against the same Podman socket. Not verified: the scan with Podman. |
 
 A successful health check can mark the container healthy during the 60 s startup grace period.
@@ -979,6 +988,7 @@ Data files of the checks and the build:
 | `.local/host-values.deny` | Optional and not tracked: the host values of one machine. |
 
 The directories `scripts/build_support/` and `scripts/maintenance/` are upstream files, not parts of the install kit.
+The image also copies `openviking_gateway/` through the build-context allowlist, but the kit does not start that component.
 
 ### Environment variables and build arguments
 
@@ -1112,6 +1122,7 @@ The table lists the facts that are written as text and can change with a release
 | The stages, the Debian packages and the extras | The `Dockerfile` | [What the image holds](#what-the-image-holds) | Base image names only. |
 | The commands in the image | `[project.scripts]` in `pyproject.toml`, and the `COPY` lines of the runtime stage | [What the image holds](#what-the-image-holds) | No command inventory check. |
 | The server port and the VikingBot port | `compose.yaml`, and `VIKINGBOT_DEFAULT_PORT` in `openviking/server/bootstrap.py` | [Processes, ports and configuration files](#processes-ports-and-configuration-files) | Container and Compose variable defaults, not the VikingBot port. |
+| The OpenViking Gateway port and its Compose status | The default port in `openviking_gateway/config.py`; `compose.yaml` does not start or publish the Gateway | [Processes, ports and configuration files](#processes-ports-and-configuration-files) and [What the image holds](#what-the-image-holds) | Nothing. Compare the default port and the Compose file by hand. |
 | The health check times | `healthcheck` in `compose.yaml` | Steps 8 and 10 | No timing check. |
 | The variables of `.env` and their defaults | `.env.example` and `compose.yaml` | Step 4, the Compose table | Step 4 and Compose variable defaults. |
 | The bake targets, the labels and the build variables | `docker-bake.hcl` | Step 7, the build tables | Build variable defaults, not targets or labels. |
