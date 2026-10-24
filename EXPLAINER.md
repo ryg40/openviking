@@ -97,8 +97,8 @@ The `Dockerfile` has four stages. Only the last stage is in the image.
 | --- | --- | --- |
 | `rust-toolchain` | `RUST_IMAGE` (`rust:1.91.1-trixie`) | The Rust toolchain. The stage `py-builder` copies `/usr/local/cargo` and `/usr/local/rustup` from it. |
 | `web-studio-builder` | `NODE_IMAGE` (`node:24-trixie-slim`) | The Web Studio bundle: `npm ci`, then `npm run build -- --base=/studio/` in `web-studio/`. |
-| `py-builder` | `PYTHON_IMAGE` (`python:3.13-slim-trixie`) | The virtual environment `/app/.venv`. `uv sync --locked` installs the project with the extras `bot`, `gemini`, `opengauss` and `gateway`. The install compiles the Rust CLI and the native extensions. |
-| Runtime (the last stage, no name) | `PYTHON_IMAGE` | The Debian packages `ca-certificates`, `curl`, `git` and `libstdc++6`, the directory `/app/.venv` and the two files of `deploy/docker/`. |
+| `py-builder` | `PYTHON_IMAGE` (`python:3.13-slim-trixie`) | The virtual environment `/app/.venv`. `uv sync --locked` installs the project with the extras `bot`, `gemini`, `opengauss` and `expiry`. The install compiles the Rust CLI and the native extensions. |
+| Runtime (the last stage, no name) | `PYTHON_IMAGE` | The Debian packages `ca-certificates`, `curl`, `git`, `libstdc++6` and `libcairo2`, the directory `/app/.venv` and the two files of `deploy/docker/`. |
 
 Each base image is pinned by digest in the `ARG` lines at the top of the `Dockerfile`.
 The [update command](docs/update.md) detects new upstream releases and pin values, then qualifies one candidate in a separate clone.
@@ -113,11 +113,13 @@ The commands in the image:
 | `openviking-pending-health` | `deploy/docker/pending_health_server.py` | A small HTTP server that answers each request with status 503 while `ov.conf` is absent. |
 | `openviking-server` | `[project.scripts]` in `pyproject.toml` | The HTTP server: the API, the Web Studio at `/studio`, the MCP (Model Context Protocol) endpoint at `/mcp` and `/health`. |
 | `vikingbot` | `[project.scripts]` in `pyproject.toml` | VikingBot. The server starts `vikingbot gateway` as a child process. |
-| `openviking-gateway` | `[project.scripts]` in `pyproject.toml` | The separate memory proxy for model clients. The kit does not start it. |
+| `openviking-gateway` | `[project.scripts]` in `pyproject.toml` | The standalone memory proxy for model clients. The kit does not start it. |
 | `ov`, `openviking` | `[project.scripts]` in `pyproject.toml` | The command-line client, a Rust program in the Python package. |
 
-OpenViking Gateway uses port `1935` by default, but `compose.yaml` does not start or publish it.
-It is separate from VikingBot Gateway and the bake target `gateway`.
+Embedded OpenViking Gateway uses `/gateway` on the server port when enabled; the kit keeps it disabled by default.
+The standalone form still defaults to loopback port `1935` and uses `/gateway`; `compose.yaml` starts no standalone process.
+Gateway is separate from VikingBot Gateway and the bake target `gateway`.
+Root API keys cannot use `/mcp`; use a user or admin key for that endpoint.
 See [OpenViking Gateway](docs/image.md#openviking-gateway) for the kit's scope and the upstream requirements.
 
 ### Processes, ports and configuration files
@@ -1122,7 +1124,7 @@ The table lists the facts that are written as text and can change with a release
 | The stages, the Debian packages and the extras | The `Dockerfile` | [What the image holds](#what-the-image-holds) | Base image names only. |
 | The commands in the image | `[project.scripts]` in `pyproject.toml`, and the `COPY` lines of the runtime stage | [What the image holds](#what-the-image-holds) | No command inventory check. |
 | The server port and the VikingBot port | `compose.yaml`, and `VIKINGBOT_DEFAULT_PORT` in `openviking/server/bootstrap.py` | [Processes, ports and configuration files](#processes-ports-and-configuration-files) | Container and Compose variable defaults, not the VikingBot port. |
-| The OpenViking Gateway port and its Compose status | The default port in `openviking_gateway/config.py`; `compose.yaml` does not start or publish the Gateway | [Processes, ports and configuration files](#processes-ports-and-configuration-files) and [What the image holds](#what-the-image-holds) | Nothing. Compare the default port and the Compose file by hand. |
+| The OpenViking Gateway forms and its Compose status | Embedded and standalone settings in `openviking_gateway/config.py`; `compose.yaml` starts no standalone process | [Processes, ports and configuration files](#processes-ports-and-configuration-files) and [What the image holds](#what-the-image-holds) | Nothing. Compare the settings and the Compose file by hand. |
 | The health check times | `healthcheck` in `compose.yaml` | Steps 8 and 10 | No timing check. |
 | The variables of `.env` and their defaults | `.env.example` and `compose.yaml` | Step 4, the Compose table | Step 4 and Compose variable defaults. |
 | The bake targets, the labels and the build variables | `docker-bake.hcl` | Step 7, the build tables | Build variable defaults, not targets or labels. |

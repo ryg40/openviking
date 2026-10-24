@@ -1207,7 +1207,7 @@ noscript p { padding: 16px; }
      "group": "api",
      "label": "HTTP server",
      "sub": "FastAPI + uvicorn",
-     "summary": "create_app builds the FastAPI app with the REST routers under /api/v1, the /mcp route and the Studio routes. bootstrap.py parses the arguments and runs uvicorn on port 1933.",
+     "summary": "create_app builds the REST, MCP and Studio routes. Optional embedded Gateway uses /gateway on the server port; the kit keeps it disabled. bootstrap.py runs uvicorn on port 1933.",
      "files": [
       "openviking/server/app.py",
       "openviking/server/bootstrap.py",
@@ -1232,8 +1232,8 @@ noscript p { padding: 16px; }
      "id": "mcp",
      "group": "api",
      "label": "/mcp endpoint",
-     "sub": "20 MCP tools",
-     "summary": "A stateless FastMCP app is mounted at /mcp. An identity middleware uses the same resolve_identity as the REST API. The tools call the same services: find, search, read, write, edit, remember, add_resource, grep, glob and more.",
+     "sub": "24 MCP tools",
+     "summary": "A stateless FastMCP app mounts at /mcp. Its middleware refuses root API keys; use a user or admin key. Tools share REST services and include privacy tree, resolve and upsert operations.",
      "files": [
       "openviking/server/mcp_endpoint.py"
      ],
@@ -1246,7 +1246,7 @@ noscript p { padding: 16px; }
      "group": "api",
      "label": "Authentication",
      "sub": "api_key, because a root key is set",
-     "summary": "An auth plugin resolves the identity of each request from X-API-Key or a bearer token. The root key manages accounts, and user keys are stored in RAGFS. Auth plugins exist for api_key, trusted, dev, oidc and ldap.",
+     "summary": "An auth plugin resolves X-API-Key or bearer-token identity. The root key manages accounts. Account Store keeps identities and credentials, using file storage by default or optional MySQL-backed providers.",
      "files": [
       "openviking/server/auth/",
       "openviking/server/api_keys/new.py",
@@ -1376,11 +1376,16 @@ noscript p { padding: 16px; }
      "group": "services",
      "label": "TaskTracker",
      "sub": "state of async jobs",
-     "summary": "The task tracker records each asynchronous job and its state in a persistent store. Callers with wait=true and the /api/v1/tasks routes read it.",
+     "summary": "TaskTracker records tasks and queue work with their identity, state and execution events. Storage defaults to files; MySQL is optional. Waiters and /api/v1/tasks read the same store.",
      "files": [
       "openviking/service/task_tracker.py",
       "openviking/service/task_store.py",
+      "openviking/service/task_store_mysql.py",
       "openviking/server/routers/tasks.py"
+     ],
+     "keys": [
+      "storage.task_store.provider",
+      "service_name"
      ]
     },
     {
@@ -1456,10 +1461,13 @@ noscript p { padding: 16px; }
      "group": "sessions",
      "label": "Session",
      "sub": "two-phase commit",
-     "summary": "A Session records messages and usage. A commit archives the messages under a path lock in the first phase and queues the rest. The second phase writes the archive summary and extracts memories.",
+     "summary": "A Session records messages and usage. Commit archives messages and queues long-term memory extraction. Working Memory summaries default off; callers must enable them explicitly.",
      "files": [
       "openviking/session/session.py",
       "openviking/session/archive_store.py"
+     ],
+     "keys": [
+      "session.memory_policy.working_memory.enabled"
      ]
     },
     {
@@ -1550,7 +1558,7 @@ noscript p { padding: 16px; }
      "group": "ingest",
      "label": "QueueManager",
      "sub": "named QueueFS queues",
-     "summary": "QueueManager runs named queues on the QueueFS plugin of RAGFS: AddResource, ExternalParse, Semantic, Embedding, SessionCommit, Reindex, ExternalTask and UserDeletion. Work is complete when no message is pending or in processing.",
+     "summary": "QueueManager runs AddResource, ExternalParse, Semantic, Embedding, ContentWrite, SessionCommit, Reindex, ExternalTask and UserDeletion queues on RAGFS. TaskTracker joins task state with owned queue work.",
      "files": [
       "openviking/storage/queuefs/queue_manager.py",
       "openviking/storage/queuefs/add_resource_processor.py",
@@ -1711,7 +1719,7 @@ noscript p { padding: 16px; }
      "to": "core",
      "type": "call",
      "label": "MCP tools",
-     "detail": "The 20 MCP tools call the same services as the routers."
+     "detail": "The 24 MCP tools call the same services as the routers."
     },
     {
      "from": "observ",
@@ -1724,8 +1732,8 @@ noscript p { padding: 16px; }
      "from": "auth",
      "to": "ragfs",
      "type": "store",
-     "label": "user keys",
-     "detail": "APIKeyManager keeps the account and user key records in RAGFS under the system paths."
+     "label": "file Account Store",
+     "detail": "The default file Account Store keeps identity and credential records in RAGFS. Optional MySQL-backed providers use separate storage."
     },
     {
      "from": "core",
@@ -2183,7 +2191,7 @@ noscript p { padding: 16px; }
     {
      "id": "commit",
      "title": "Session commit",
-     "summary": "A commit archives the messages in the first phase. A queued second phase summarizes the archive and extracts memories.",
+     "summary": "A commit archives messages in the first phase. A queued second phase extracts memories and generates Working Memory only when enabled.",
      "steps": [
       {
        "node": "http",
@@ -2213,7 +2221,7 @@ noscript p { padding: 16px; }
        "node": "queues",
        "title": "Queue the second phase",
        "label": "SessionCommit",
-       "text": "The session puts a SessionCommit message on the queue and creates a task."
+       "text": "The session creates the task with its identity before it puts a SessionCommit message on the queue."
       },
       {
        "node": "sess",
@@ -2963,7 +2971,7 @@ noscript p { padding: 16px; }
    "view": "internals",
    "node": "core",
    "title": "The service layer",
-   "text": "The REST routers and the 20 MCP tools call one OpenVikingService object. It holds the services for files, search, sessions, resources, packs and debug."
+   "text": "The REST routers and the 24 MCP tools call one OpenVikingService object. It holds the services for files, search, sessions, resources, packs and debug."
   },
   {
    "view": "internals",

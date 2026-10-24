@@ -347,7 +347,7 @@ git("rm", "-q", "--cached", helper)
 check("mapped helper absent from tree", 1, "tree-upstream-helper")
 git("add", helper)
 mutate("changed helper", helper, lambda old: old + "\n// changed\n", "tree-upstream-helper")
-helper = ".github/scripts/check-plugin-version-bumps.sh"
+helper = ".github/scripts/reproducible-zip.sh"
 git("update-index", "--chmod=-x", helper)
 check("helper mode", 1, "tree-upstream-helper")
 git("update-index", "--chmod=+x", helper)
@@ -524,6 +524,24 @@ mutate(
     lambda old: old + '\nvariable "EXTRA" {\n  default = "' + pin_digest + '"\n}\n',
     "pin-copy",
 )
+# The repaired lock retains exact upstream Jiter lines, not a lockfile exemption.
+lock_lines = Path("uv.lock").read_text().splitlines(keepends=True)
+pin_entries = [
+    item for item in json.loads(Path("scripts/public-rules.json").read_text())["pins"]["allowed"]
+    if item["path"] == "uv.lock"
+]
+control("Jiter lock exceptions are present", len(pin_entries) == 90)
+for entry in pin_entries:
+    line = next(line for line in lock_lines if re.fullmatch(entry["pattern"], line.rstrip("\n")))
+    digest = hashlib.sha1(b"blob " + str(len(line.encode())).encode() + b"\0" + line.encode()).hexdigest()
+    control("Jiter lock line hash", digest == entry["line_blob"])
+    mutate(
+        "changed Jiter lock line fails",
+        "uv.lock",
+        lambda old, line=line: old.replace(line, line.rstrip("\n") + " # changed\n", 1),
+        "pin-copy",
+    )
+
 # An exact upstream blob is accepted. Any changed byte puts the file in scope.
 rules_path = root / "scripts/public-rules.json"
 saved_rules = rules_path.read_bytes()
@@ -571,6 +589,28 @@ for digest in [
         lambda old, line=line: old.replace(line, line.replace("`Caddyfile`", "`missing/Caddyfile`").replace("`.github/", "`missing/.github/")),
         "document-code-path",
     )
+# New scanner fixtures remain exact lines, with recorded line hashes.
+fixture_block = Path(".gitleaks.toml").read_text().split(
+    'description = "Exact upstream privacy and MCP synthetic fixture lines"', 1
+)[1].split("[[allowlists]]", 1)[0]
+fixture_entries = re.findall(
+    r"# ([^;]+); line hash ([0-9a-f]{20}) ([0-9a-f]{20})\n\s*'''([^\n]+)'''",
+    fixture_block,
+)
+control("all exact scanner fixture lines have hashes", len(fixture_entries) == 5)
+for location, first, last, pattern in fixture_entries:
+    path, number = location.rsplit(":", 1)
+    line = Path(path).read_text().splitlines(keepends=True)[int(number) - 1]
+    blob = hashlib.sha1(b"blob " + str(len(line.encode())).encode() + b"\0" + line.encode()).hexdigest()
+    expression = re.compile(pattern)
+    control("scanner fixture line hash " + location, blob == first + last)
+    control("scanner fixture accepted " + location, expression.search(line) is not None)
+    changed = line.replace("ABCDEFGHIJKLMNOP", "ABCDEFGHIJKLMNOPQ").replace("{BODY}", "{CHANGED}")
+    changed = changed.replace("1234567890abcd", "1234567890abce").replace("_api_key", "_api_keZ")
+    changed = changed.replace("ABCDEF", "ABCDEG")
+    control("changed scanner fixture rejected " + location, expression.search(changed) is None)
+    control("adjacent scanner value rejected " + location, expression.search("other " + line.lstrip()) is None)
+
 # Exact content exception accepts one line, not the next line or the whole file.
 rules["exceptions"].append(
     {"rule": "private-tracker", "line_blob": sample_blob, "reason": "Synthetic test line."}

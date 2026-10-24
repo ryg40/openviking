@@ -247,16 +247,20 @@ stage that downloads. That changes upstream `RUN` lines. Open point.
 
 ## OpenViking Gateway
 
-Upstream adds OpenViking Gateway, a model proxy that adds memory without a client plugin.
-Its separate process, `openviking-gateway`, uses port `1935` by default and requires the `gateway` configuration section and two secret variables.
-The image includes its dependencies, but the kit's `compose.yaml` does not start it yet.
+OpenViking Gateway is a model proxy that adds memory without a client plugin.
+The embedded form uses `/gateway` on the server port when `gateway.enabled` is true; the default is false.
+The standalone command `openviking-gateway` still defaults to loopback port `1935`, with the same `/gateway` prefix.
+It reads a separate configuration file or environment variables, not the server's `ov.conf`.
+Gateway dependencies are now core dependencies; the removed `gateway` extra is no longer needed.
+The image includes them, but the kit keeps Gateway disabled and starts no standalone Gateway process.
+A management key restricts configuration changes; it is separate from user authentication and no longer uses the old admin-token setting.
 The bake target `gateway` still builds the server image; it does not start OpenViking Gateway or the VikingBot gateway.
 See the [upstream OpenViking Gateway operations](en/guides/22-gateway-operations.md) for its requirements.
 
 ## Runtime content
 
 The runtime image is the pinned `PYTHON_IMAGE` from `Dockerfile` plus Debian packages
-(`ca-certificates`, `curl`, `git`, `libstdc++6`), the virtual environment
+(`ca-certificates`, `curl`, `git`, `libstdc++6`, `libcairo2`), the virtual environment
 `/app/.venv` that the Python build stage produced from this source tree and
 `uv.lock`, and the two entrypoint scripts from `deploy/docker/`. It holds no
 configuration, key or state: `/app/.openviking` is empty, and no `ov.conf`,

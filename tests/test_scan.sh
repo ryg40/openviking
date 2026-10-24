@@ -111,6 +111,41 @@ expect_status "Bearer token of real shape: finding" 1 in_repo "$work/bearer" sh 
 expect_out "the Bearer finding names the rule" "fixture.mjs:1  rule curl-auth-header"
 expect_no_out "the output does not contain the Bearer token" "$bearer"
 
+echo "# exact upstream privacy and MCP fixture lines"
+python3 - "$repo_root" "$work" <<'PY'
+import pathlib
+import re
+import sys
+source, work = map(pathlib.Path, sys.argv[1:])
+block = (source / ".gitleaks.toml").read_text().split(
+    'description = "Exact upstream privacy and MCP synthetic fixture lines"', 1
+)[1].split("[[allowlists]]", 1)[0]
+lines = []
+for path, number in re.findall(r"# ([^;]+):([0-9]+); line hash", block):
+    all_lines = (source / path).read_text().splitlines(keepends=True)
+    # The curl rule starts on the preceding line and spans two source lines.
+    lines.append("".join(all_lines[int(number) - (2 if number == "77" else 1):int(number)]))
+(work / "exact-fixtures.txt").write_text("".join(lines))
+PY
+new_repo "$work/exact-fixtures"
+cp "$work/exact-fixtures.txt" "$work/exact-fixtures/fixture.txt"
+g -C "$work/exact-fixtures" add fixture.txt
+expect_status "exact upstream fixture lines: accepted" 0 in_repo "$work/exact-fixtures" sh "$scan" tree
+python3 - "$work/exact-fixtures/fixture.txt" <<'PY'
+import pathlib
+import sys
+p = pathlib.Path(sys.argv[1])
+s = p.read_text().replace("ABCDEFGHIJKLMNOP", "ABCDEFGHIJKLMNOQ")
+s = s.replace("{BODY}", "{CHANGED}").replace("1234567890abcd", "1234567890abce")
+s = s.replace("_api_key", "_api_keZ").replace("ABCDEF'", "ABCDEG'")
+p.write_text(s)
+PY
+g -C "$work/exact-fixtures" add fixture.txt
+expect_status "changed upstream fixture lines: findings" 1 in_repo "$work/exact-fixtures" sh "$scan" tree
+for rule in aws-access-token curl-auth-user generic-api-key curl-auth-header; do
+    expect_out "changed fixture retains $rule coverage" "rule $rule"
+done
+
 echo "# authentication placeholder allowlist"
 new_repo "$work/root-placeholder"
 root_placeholder=$(printf '%s%s' your-secret-root-key -here)

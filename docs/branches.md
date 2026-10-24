@@ -67,10 +67,12 @@ Replace `v<X.Y.Z>` with the new release tag, then run the blocks in order in one
    | --- | --- | --- |
    | `CONTRIBUTING.md` | The kit section at the end stays; the upstream text above it follows upstream | this repo |
    | `Dockerfile` | Base image pins, `REGISTRY_PREFIX`, redirect arguments, uv from PyPI, base labels (six changes) | [image.md](image.md), "Changes against the upstream tag" |
+   | `uv.lock` | Regenerate with the pinned uv to include the upstream `bot` extra's NumPy requirement; keep all resolved package versions | this repo |
    | `.dockerignore` | Allowlist of the `COPY` sources | [image.md](image.md), "Build context" |
    | `.github/dependabot.yml` | Deleted; do not restore during an upstream sync | this repo |
    | `.github/scripts/generate-channels-json.sh` | Deleted; its only caller is the deleted upstream release workflow | [public-check.md](public-check.md), "Rules" |
    | `.github/scripts/host-compat.mjs`, `.github/host-compat.json` | Deleted; only the removed upstream host-compatibility workflow uses them | [public-check.md](public-check.md), "Rules" |
+   | `.github/scripts/check-plugin-version-bumps.sh` | Deleted; no retained executable file calls it | [public-check.md](public-check.md), "Rules" |
    | `.github/workflows/` (all upstream files) | Deleted; delete new upstream workflow files after each sync. Keep only workflows written for this repo. | [ci.md](ci.md) |
    | `.github/ISSUE_TEMPLATE/` (all 4 upstream files), `.github/PULL_REQUEST_TEMPLATE.md` | Deleted; do not restore upstream templates during a sync | this repo |
    | `.gitignore` | Private ignore rules: `.local/`, `.env`, `.env.*` (except `.env.example`) and `data/` | [host-configuration.md](host-configuration.md), "Host values and where they live" |
@@ -86,7 +88,7 @@ Replace `v<X.Y.Z>` with the new release tag, then run the blocks in order in one
    | `examples/pi-coding-agent-extension/package.json`, `examples/pi-coding-agent-extension/package-lock.json` | Pin @modelcontextprotocol/client to exact `2.2.0` for [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (an MCP client security advisory); upstream pins `2.0.0` | this repo |
    | `examples/pi-coding-agent-extension/tests/takeover-session-manager.test.mjs` | Confirm Working Memory in the mock commit response, as the upstream takeover guard requires | [testing.md](testing.md), "Pi extension tests" |
    | `examples/pi-coding-agent-extension/lib/capture-utils-local.mjs` | Local wrapper of shared filters; keep tool-output opt-in, credential redaction and keyword capture | [Pi extension README](../examples/pi-coding-agent-extension/README.md), "Local fork: differences and updating an installed copy" |
-   | `openviking/session/session.py` | Model-error propagation now matches upstream; keep the retained regression test when upstream moves helpers | [Working-memory regression tests](../tests/unit/session/test_extraction_batch.py), `test_working_memory_propagates_model_errors` |
+   | `tests/unit/session/test_extraction_batch.py` | Keep the model-error propagation regression; its direct summary call does not depend on the Working Memory default | this repo |
    | `tests/misc/test_abi3_packaging_config.py` | Keep workflow tests skipped when their workflow is absent after each sync | this repo |
    | `tests/misc/test_root_docker_image_packaging.py` | Keep workflow tests skipped when their workflow is absent after each sync | this repo |
    | `tests/misc/test_docker_workflow_native_multiarch.py` | Deleted; remove tests that only read deleted workflows after each sync | this repo |

@@ -17,37 +17,48 @@
 #       path). The scan uses these lines only when the base commit is not in
 #       the repository (a shallow clone). No rule of .local/host-values.deny
 #       goes into this file.
-tag	v0.5.0	20f9c11362ad16193b0daa4a414e1095061af427
+tag	v0.5.2	7f3ae1af822d936c1d0b070537772b0f1d59122f
 # Upstream demo evidence of the Pi context-management example: a zip of
 # 74 text files (JSON, logs, Markdown, scripts); tree mode reads it: no finding.
 archive	7110648c99e89cf8e35d9ae5a5f50cdc887b23f9	examples/pi-experimental-context-management/demo-evidence/pi-ctxwin-demo.zip
+# Upstream schema definitions and a migration template contain no row data.
+archive	414ec0cd3c16fc86bccab196da76fbeedf28bdb6	openviking/server/account_stores/sql/changes/0000_template.sql
+archive	3fae25d302a51a26a7b932472fbac5111fa3a2fa	openviking/server/account_stores/sql/init.sql
+archive	0bcaf4e098f1c140ce207430e8ff73f3d9e32b1e	openviking/service/sql/task_store_init.sql
 hit	03ff6392fd1a39c81d61709399efaecb22c520ed	tests/misc/test_network_guard.py
 hit	0dbc110853c29a4c799d42f8928b05b1cab8e0ff	tests/misc/test_network_guard.py
 hit	0e0e0723ffb6386b035c6766630f55eb7c46c35d	docs/en/guides/11-grafana-prometheus.md
+hit	1efeb294b907d49657e0d7d6164e45d7b8598b0e	web-studio/src/hooks/use-studio-service.test.tsx
 hit	247a940fa7b6b446f4770f7a3035d709f5ee1141	examples/openclaw-plugin/scripts/install.sh
 hit	24a3ac925a89b458c65c191702903955c7fe7b54	tests/vectordb/test_opengauss_adapter_complete.py
 hit	266ce42abf881464be38265028737f0d0641217f	tests/test_server_config_loader.py
 hit	2d4fe1b17565ed314c0563a9215832188f9f2abf	tests/misc/test_network_guard.py
 hit	34da6130ca6f1d930dd0781b08f220480752d01f	examples/openclaw-plugin/tests/e2e/test-archive-expand.py
 hit	357db9a4fcf8f0ef75c113edcf2c7e238c636030	tests/misc/test_network_guard.py
+hit	389fbc939c6325d7d3b8e76da033428d35ba17f0	web-studio/src/hooks/use-connection-profiles.test.tsx
+hit	3aa200297402483a9c41420f2ddc7d302b72bec8	web-studio/src/lib/studio-service.test.ts
+hit	484935a4da3a6f3ecfbf2df8b9b36a40253fbfd4	web-studio/src/lib/studio-service.test.ts
 hit	5456d61092547e27b0cb9e42d575404222cb213c	tests/misc/test_network_guard.py
 hit	5a191e9ecfc0378647f3723b17c78c08e919d6ab	tests/unit/test_ollama_utils.py
-hit	6309cfdbaa7ef9c62d09141a49a49a03e7f30566	docs/en/guides/13-multi-write-storage.md
 hit	68d67d95a2f809aab86b472a24cdc17aa5c65a85	tests/server/test_auth.py
 hit	78e3b90a12ac7ddea5c6a1f4f8b50e604ae8d07b	docs/zh/guides/11-grafana-prometheus.md
 hit	795458228c416123901fb5c24178f109c4934a79	tests/unit/test_ollama_utils.py
 hit	7b094e805a3eae8683ebc40594be761873dea524	tests/vectordb/test_opengauss_adapter_complete.py
+hit	8bbe57a4960528647cd35903b558f9900a9e5e8e	web-studio/src/lib/studio-service.test.ts
 hit	8bd846eac2a65da9226c5269ec8cc0254d88e5ed	web-studio/src/routes/gateway/-lib/format.test.ts
 hit	8d4a964af77d29f89f4456df861be21a0f7e00e2	tests/misc/test_network_guard.py
-hit	92d7461dc48a2b4cff9a311ddd77b785b8ae739d	docs/zh/guides/13-multi-write-storage.md
 hit	97d9f210a967ba60ae3ad73c3aace91cfe5a49ad	examples/openclaw-plugin/skills/install-openviking-memory/SKILL.md
+hit	9ac61d690367f6ee26a3d513cfac81e48f2bc727	web-studio/src/lib/connection/profiles.test.ts
 hit	a76e3fe47be26815a0e2de80b8e7af85729d3327	tests/misc/test_network_guard.py
 hit	ac049fc678f08081abc13fe93ffba1e612900f44	web-studio/src/routes/gateway/-lib/format.test.ts
 hit	bad23d24aef5f87217b3a51a111132cffe4b7a44	tests/vectordb/test_opengauss_adapter_complete.py
 hit	bc3ed94dbf6742148d8520e3c29bf0781af30f2a	tests/server/test_auth.py
 hit	c1a0f03cda879c7cfa5a564b3a3a249335ec4c55	examples/openclaw-plugin/skills/install-openviking-memory/SKILL.md
 hit	c7375ad6189e9aff58e54201612e2a5a46166147	examples/openclaw-plugin/tests/e2e/test-archive-expand.py
+hit	ce61a1bce05440cc41b5189b412f123885dd3a38	tests/gateway/test_gateway_config.py
+hit	d65f23831f84bad528495399947b60223fd33b15	web-studio/src/lib/connection/profiles.test.ts
 hit	e2eb3e334cbd9d253b1910e39e7af620e11ac5f0	examples/openclaw-plugin/tests/e2e/test-archive-expand.py
+hit	e608dcd473c0648d33aefcb3d3d11119d6e7ee1e	web-studio/src/lib/studio-service.test.ts
 hit	ec8b306b544d2a37a380a24e9893784188c53a42	tests/misc/test_network_guard.py
 hit	f3a9bd623a493f1436a9525711a371ca9c3fc88a	tests/unit/test_ollama_utils.py
 hit	f623524c09b5c4e189fe7a9c54533fc22e14f927	web-studio/src/routes/gateway/-lib/upstream-schema.test.ts

@@ -119,6 +119,11 @@ The output line `scan: <n> finding(s) in upstream content accepted (...)` gives 
 | Code, `benchmark/`, `bot/tests/`, `tests/misc/` | `approx_chars_div_4`, `dimension=1536`, `skip_heartbeat=True` | 1 + 1 + 3 | call arguments, not secrets |
 | [Upstream community template](https://github.com/volcengine/OpenViking/blob/main/.github/ISSUE_TEMPLATE/config.yml), absent from this tree | the Lark invitation URL form (line allowlist, UUID token) | 1 | the public join link of the upstream community group |
 
+Five additional upstream fixture lines have exact, anchored line exceptions with their line hashes recorded in `.gitleaks.toml`.
+They cover synthetic AWS credentials, a formatted curl user value, two test keys and a captured tool command.
+The exceptions do not accept changed values or adjacent secret lines.
+`tests/test_public_check.sh` checks each line hash and its negative controls; the scanner suite checks actual findings.
+
 The additional authentication placeholder belongs to the documentation placeholder family.
 The earlier family counts remain historical; the current scan output gives the accepted upstream count.
 The Lark invitation allowlist remains in `.gitleaks.toml`, but its source template is absent from this tree.
@@ -144,7 +149,11 @@ A hardcoded secret in an upstream file gets no allowlist entry. It is removed fr
 | --- | --- | --- |
 | `7110648c` | `examples/pi-experimental-context-management/demo-evidence/pi-ctxwin-demo.zip` | upstream demo evidence: 74 text files; the mode `tree` reads into it and finds nothing |
 
-An `archive` line of `scripts/upstream-base` names the exact blob and path. A changed zip or a copy at another path is a policy finding.
+The baseline also accepts three upstream SQL source files by exact path and blob: account initialization, its migration template and task-store initialization.
+These files define schemas and contain no row data.
+They are `openviking/server/account_stores/sql/init.sql`, `openviking/server/account_stores/sql/changes/0000_template.sql` and `openviking/service/sql/task_store_init.sql`.
+An `archive` line of `scripts/upstream-base` names the exact blob and path.
+A changed file or a copy at another path is a policy finding.
 
 ### A new upstream tag
 

@@ -86,10 +86,11 @@ The `github_scripts` map lists each retained upstream helper's path, Git mode an
 An empty map is an error.
 Each listed helper must be tracked with its exact mode and blob hash.
 No other GitHub path is accepted.
-The current tree retains ten helpers used by the upstream plugin tests and their helper calls.
+The current tree retains nine helpers used by the upstream plugin tests and their helper calls.
 The channel generator is deleted because its only caller is a deleted upstream release workflow.
 The host-compatibility helper and its JSON configuration are deleted because no retained executable file calls them.
 The download builder and archive checker stay because the shared plugin tests call both helpers.
+The plugin-version checker is deleted because no retained executable file calls it.
 
 The deletion list has one repository-relative path per line.
 The reader strips surrounding whitespace and ignores blank lines and lines that start with `#`.
@@ -141,6 +142,8 @@ Stage cells permit image names only, never digests.
 The scanner binary-version declaration must equal the version in its image reference.
 The generated upstream map is derived data, checked separately against the generator.
 No test file receives a whole-file exception.
+The locally regenerated dependency lock keeps exact upstream Jiter metadata lines whose version equals the independent uv tool version.
+Each permitted line has its own content hash; changed metadata fails, and no whole-lockfile exception applies.
 
 After a tag, digest or scanner pin change, change nothing in the documents.
 Run `sh scripts/public-check.sh` and `sh tests/test_public_check.sh`.

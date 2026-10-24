@@ -24,7 +24,7 @@
 
 ### 可调用工具
 
-“服务端 MCP 工具”指服务端 `tools/list` 返回的工具：当前服务端有 20 个，列在[服务端 MCP 工具](#服务端-mcp-工具)。
+“服务端 MCP 工具”指服务端 `tools/list` 返回的工具：当前服务端有 21 个，列在[服务端 MCP 工具](#服务端-mcp-工具)。
 
 | 集成 | 接入方式 | Agent 可调用的工具 |
 |---|---|---|
@@ -54,7 +54,7 @@
 | ZCode | 是，带会话 | profile、记忆索引、skill | 每轮 | 没有退出事件；每轮已提交 | 没有压缩前事件 |
 | Kimi Code | 是，带会话 | profile、记忆索引、skill，在首次提问时 | 每捕获 8 条消息 | 仅当 `SessionEnd` 捕获到新消息 | 提交新捕获的消息 |
 | OpenCode | 是，带会话 | profile、记忆索引、skill、已索引的仓库 | 空闲时，待提交 token 达到 20,000 | 是，在宿主的清理时限内 | 在压缩前后提交 |
-| DSH | 是，带会话 | profile、记忆索引、skill，每个会话一次 | 待提交 token 达到 20,000 | 是，预算 3 秒 | 未观察到 |
+| DSH | 是，带会话 | profile、记忆索引、skill，每个会话一次 | 待提交 token 达到 20,000 | 是，预算 3 秒 | 先提交，再由宿主摘要 |
 | pi | 是，带会话 | profile、记忆索引、skill，每轮 | takeover 开：约 30,000 token；关：20,000 | takeover 开：否；关：是 | takeover 替换 pi 的摘要 |
 | OpenClaw | 是，带会话 | profile，每轮 | token 预算的一半（默认 64,000） | 否 | 插件接管压缩 |
 | Hermes（内置） | 是，带会话，有回退路径 | profile 与记忆清单 | 否；只在会话边界 | 是，前提是待上传内容在 10 秒内完成 | fork 型压缩时提交 |
@@ -81,7 +81,7 @@
 
 | 分组 | 工具 |
 |---|---|
-| 检索与浏览 | `find`、`search`、`read`、`list`、`tree`、`grep`、`glob` |
+| 检索与浏览 | `find`、`search`、`read`、`download`、`list`、`tree`、`grep`、`glob` |
 | 写入 | `remember`、`write`、`edit`、`add_resource`、`add_skill` |
 | 删除 | `forget` |
 | 监听资源 | `list_watches`、`cancel_watch`（商业版暂不支持） |
@@ -318,7 +318,7 @@ Claude Code 和 Codex 默认 `auto`，其他集成默认 `off`。支持服务端
 | ZCode | 每个 `Stop`；漏掉的 `Stop` 对应的轮次，在下一个 `Stop` 从 rollout 文件补齐 | 无 | 没有压缩前事件 |
 | Kimi Code | 距上次提交捕获满 8 条消息时，在 `Stop` 提交 | `SessionEnd` 和 `Interrupt` 捕获到新消息时提交 | `PreCompact` 捕获到新消息时提交 |
 | OpenCode | v1 `session.idle`、v2 执行结束时：待提交 token 达到 20,000 | 删除会话、v1 `session.error`、v1 dispose 和 v2 cleanup 强制提交 | v1 在压缩前后各一次；v2 在压缩结束后一次 |
-| DSH | `turn/end` 时待提交 token 达到 20,000 | Cordis teardown 提交每个会话 | 无 |
+| DSH | `turn/end` 时待提交 token 达到 20,000 | Cordis teardown 提交每个会话 | `compaction/start` 提交，跳过阈值检查 |
 | pi，takeover 开（默认） | 本地估算达到 30,000 token，且用户轮多于 3 个 | `/viking commit` | `session_before_compact` |
 | pi，takeover 关 | 每次同步后待提交 token 达到 20,000 | `session_shutdown` 和 `/viking commit` | `session_before_compact` |
 | OpenClaw | 每轮结束后达到 `tokenBudget × commitTokenThresholdRatio`（默认 128,000 × 0.5） | `/new`、`/reset` 和 `memory_store` 提交并等待 | `compact()` 提交，并最多等待 5 分钟完成抽取 |
@@ -360,7 +360,8 @@ Claude Code 和 Codex 默认 `auto`，其他集成默认 `off`。支持服务端
 
 | 集成 | 写入失败时 |
 |---|---|
-| Claude Code、Cursor、TRAE、TRAE CN、ZCode、Kimi Code、OpenCode、DSH、pi | 可重试的失败进入 `~/.openviking/pending` 下的磁盘队列，在会话开始时重放：每次最多 50 条，每条最多 3 次，保留 7 天。网络错误、408、429 和 5xx 可重试；其他 4xx（含 401 和 403）不入队。某条消息重放失败时停止，以保证顺序 |
+| Claude Code、TRAE、TRAE CN、ZCode、Kimi Code、OpenCode、DSH、pi | 可重试的失败进入 `~/.openviking/pending` 下的磁盘队列，在会话开始时重放：每次最多 50 条，每条最多 3 次，保留 7 天。网络错误、408、429 和 5xx 可重试；其他 4xx（含 401 和 403）不入队。某条消息重放失败时停止，以保证顺序 |
+| Cursor | 新捕获不入离线队列。文本 transcript 与本地工具记录保留未上报内容，服务端确认后才推进进度；同一会话后续采集重试。消息未传完整时不提交。`SessionStart` 仍重放旧队列中的写入 |
 | Codex、TraeCode CLI 2.0 | 新捕获的内容不入队。transcript 游标只越过服务端已接受的消息，下次捕获或启动扫描会重发剩余部分。`SessionStart` 仍会重放已排队的条目 |
 | OpenClaw | 没有队列，失败的轮次不会重发 |
 | Hermes（内置） | 上传在进程内线程中运行，不从磁盘重放。`$HERMES_HOME/openviking/pending_sessions/` 下的待提交标记让之后的启动能提交已退出进程留下的会话（仅 POSIX） |
@@ -395,7 +396,7 @@ Claude Code 和 Codex 默认 `auto`，其他集成默认 `off`。支持服务端
 | TRAE、TRAE CN、ZCode | 宿主摘要 | 没有压缩前事件 | 无 |
 | Kimi Code | 宿主摘要 | `PreCompact` 提交新捕获的消息 | 无 |
 | OpenCode | 宿主摘要 | v1 刷新并提交；v2 捕获 transcript | v1 在 `session.compacted` 时再提交一次；v2 在 `session.compaction.ended` 后提交 |
-| DSH | 未观察到 | 无。注入的上下文是一条用户消息，随宿主压缩一起缩减；profile 不再发送 | 无 |
+| DSH | 宿主摘要 | `compaction/start` 无论 token 阈值如何都会提交。注入的上下文是一条用户消息，随宿主压缩一起缩减；profile 不再发送 | 无 |
 | pi | takeover，默认开启 | 提交并等待归档概览 | 用概览替换 pi 的摘要；失败时 pi 照常压缩 |
 | OpenClaw | 插件接管压缩 | `compact()` 提交并等待 | 下一次上下文组装从服务端重建历史 |
 | Hermes（内置） | 宿主摘要 | fork 型压缩提交旧会话；原地压缩不做任何处理 | 无 |
@@ -547,7 +548,7 @@ Claude Code 和 Codex 默认 `auto`，其他集成默认 `off`。支持服务端
 | Hermes（内置） | 无 | 无 | 无 | 有；`hermes memory status` 列出环境变量覆盖项 |
 | ov CLI | 无 | CLI 本身 | 无 | `ov config` |
 
-Claude Code、Codex、Cursor、TRAE、ZCode、Kimi Code、DSH 和 pi 还会安装 **URI guard**：文件工具的路径是 `viking://` URI 时，调用会被拒绝，并提示改用 OpenViking 工具；shell 命令中包含这种 URI 时照常执行，但附带一条提示。各宿主检查哪些工具不同，见[各集成说明](#各集成说明)。
+Claude Code、Cursor、TRAE、ZCode、Kimi Code、DSH 和 pi 还会安装 **URI guard**：文件工具的路径是 `viking://` URI 时，调用会被拒绝，并提示改用 OpenViking 工具；shell 命令中包含这种 URI 时照常执行，但附带一条提示。各宿主检查哪些工具不同，见[各集成说明](#各集成说明)。
 
 <a id="_4-harness-档案卡"></a>
 
@@ -569,20 +570,20 @@ Claude Code、Codex、Cursor、TRAE、ZCode、Kimi Code、DSH 和 pi 还会安�
 
 ### Codex 与 TraeCode CLI 2.0
 
-[Codex](./04-codex.md)、[TRAE](./13-trae.md)。插件市场插件，包含 6 个 hook（`SessionStart`、`UserPromptSubmit`、`PreToolUse:Bash`、`Stop`、`SessionEnd`、`PreCompact`）、一个 MCP 代理，以及与 Claude Code 相同的 4 个 skill。
+[Codex](./04-codex.md)、[TRAE](./13-trae.md)。插件市场插件，包含 6 个 hook（`SessionStart`、`UserPromptSubmit`、`Stop`、`SessionEnd`、`PreCompact`、`PostToolUse`）、一个 MCP 代理，以及与 Claude Code 相同的 4 个 skill。
 
 - `SessionEnd` 只在干净退出且 Codex 0.145 及以上时触发。信号、崩溃、旧版本和 `codex app-server` 延后的情况都交给启动时的扫描，扫描使用 30 分钟空闲超时。
 - `Stop` 和 `SessionEnd` 在分离的 worker 中写入。每个会话一把锁，按顺序处理 `Stop` worker、`PreCompact`、`SessionEnd` worker 和扫描。
-- Codex 用 `apply_patch` 编辑文件，它没有路径参数，所以 Bash 上的 URI guard 只附加提示，从不拒绝。
+- 不安装 URI guard。Codex 会把 `PreToolUse` 的提示写在工具调用和它的输出之间，火山方舟 Ark 这类按 chat 消息校验历史的 Responses 服务端会因此返回 HTTP 400。
 - Codex 为每个 hook 保存信任记录。升级新增 hook 后，需要在 `/hooks` 中批准新的 hook。
 - TraeCode CLI 2.0（可执行文件 `traecli`，配置 `~/.trae/traecli.toml`）是 Codex 系 CLI，安装同一个插件。只支持 2.0；早期面向 1.0 的独立插件已移除，`--harness trae-cli --uninstall` 仍可删除旧安装留下的副本。不带 `SessionEnd` 的版本会忽略该 hook。
 
 ### Cursor
 
-[Cursor](./12-cursor.md)。hook 与 MCP 配置，包含 6 个 hook（`sessionStart`、`beforeSubmitPrompt`、`beforeReadFile`、`stop`、`preCompact`、`sessionEnd`）、一条常驻 rule 和 3 个 skill。
+[Cursor](./12-cursor.md)。hook 与 MCP 配置，包含 7 个 hook（`sessionStart`、`beforeSubmitPrompt`、`beforeReadFile`、`afterMCPExecution`、`stop`、`preCompact`、`sessionEnd`）、一条常驻 rule 和 3 个 skill。
 
 - URI guard 只在 `beforeReadFile` 运行，不受插件开关影响。shell 命令不检查，升级会移除旧版本注册的 `beforeShellExecution` 条目。
-- 只捕获文本，所以 `ov-experience-memory` 能检索和应用 Experience，但无法把读取关联回所用的 Experience。
+- `afterMCPExecution` 保留 OpenViking 工具完成记录，Stop 与对话一起上报。成功读取的 Experience 可关联到同次提交生成的轨迹；失败、未完成调用和自动注入不计为成功读取。
 - `sessionEnd` 只在关闭窗口时触发，此时 Cursor 已停止执行 hook 命令，因此实际不会提交。
 - 服务端不可达时，每轮都要等满 15 秒召回超时。
 

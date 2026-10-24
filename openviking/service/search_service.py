@@ -8,6 +8,7 @@ Provides search operations: search, find.
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
+from openviking.core.namespace_policy import is_system_uri
 from openviking.core.retrieval_types import SearchType
 from openviking.server.identity import RequestContext
 from openviking.storage.viking_fs import VikingFS
@@ -17,6 +18,7 @@ from openviking.utils.image_search import (
     is_http_url,
     is_viking_uri,
 )
+from openviking.utils.model_retry import model_retry_scope
 from openviking_cli.exceptions import InvalidArgumentError, NotInitializedError
 from openviking_cli.retrieve import ContextType
 from openviking_cli.utils import get_logger
@@ -27,18 +29,29 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-def _ensure_non_empty_query(
+def _reject_system_targets(target_uri: Union[str, List[str]]) -> None:
+    targets = [target_uri] if isinstance(target_uri, str) else target_uri
+    for uri in targets:
+        if uri and is_system_uri(uri):
+            raise InvalidArgumentError(f"search is not supported for namespace: {uri}")
+
+
+def _validate_query(
     query: str,
-    image_url: Optional[str] = None,
+    image_url: str | list[str] | None = None,
     filter: Optional[Dict] = None,
 ) -> None:
-    """Reject a request that gives the search nothing to work with.
+    """Reject malformed query text or a request with nothing to search for.
 
     A filter is an acceptable substitute for a query: the result set is then
     fully determined by the filter, which is exactly what an exact-match lookup
     (e.g. by a tag carrying an external id) needs. Without either one the call
     would return an arbitrary slice of the whole store.
     """
+    try:
+        query.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise InvalidArgumentError("Search query must contain valid Unicode text.") from exc
     if query.strip() or image_url or filter:
         return
     raise InvalidArgumentError(
@@ -90,9 +103,11 @@ class SearchService:
 
     async def _resolve_image_url(
         self,
-        image_url: Optional[str],
+        image_url: str | list[str] | None,
         ctx: RequestContext,
-    ) -> Optional[str]:
+    ) -> str | list[str] | None:
+        if isinstance(image_url, list):
+            return [await self._resolve_image_url(url, ctx) for url in image_url]
         if not image_url:
             return None
         if is_viking_uri(image_url):
@@ -105,6 +120,7 @@ class SearchService:
             "image_url must be a data:image base64 URI, http(s) URL, or viking:// URI."
         )
 
+    @model_retry_scope(0)
     async def search(
         self,
         query: str,
@@ -115,7 +131,7 @@ class SearchService:
         score_threshold: Optional[float] = None,
         filter: Optional[Dict] = None,
         level: Optional[List[int]] = None,
-        image_url: Optional[str] = None,
+        image_url: str | list[str] | None = None,
         events_time_decay_protection: Optional[str] = None,
         search_type: SearchType = "semantic",
         context_types: Optional[List[ContextType]] = None,
@@ -137,7 +153,8 @@ class SearchService:
         if search_type == "keywords" and image_url:
             raise InvalidArgumentError("image_url is not supported when search_type='keywords'")
         resolved_image_url = await self._resolve_image_url(image_url, ctx)
-        _ensure_non_empty_query(query, resolved_image_url)
+        _validate_query(query, resolved_image_url)
+        _reject_system_targets(target_uri)
         if search_type == "keywords":
             await self.ensure_keywords_search_supported(ctx)
         viking_fs = self._ensure_initialized()
@@ -163,6 +180,7 @@ class SearchService:
         )
         return result
 
+    @model_retry_scope(0)
     async def find(
         self,
         query: str,
@@ -172,7 +190,7 @@ class SearchService:
         score_threshold: Optional[float] = None,
         filter: Optional[Dict] = None,
         level: Optional[List[int]] = None,
-        image_url: Optional[str] = None,
+        image_url: str | list[str] | None = None,
         events_time_decay_protection: Optional[str] = None,
         search_type: SearchType = "semantic",
     ) -> Any:
@@ -192,7 +210,8 @@ class SearchService:
         if search_type == "keywords" and image_url:
             raise InvalidArgumentError("image_url is not supported when search_type='keywords'")
         resolved_image_url = await self._resolve_image_url(image_url, ctx)
-        _ensure_non_empty_query(query, resolved_image_url, filter)
+        _validate_query(query, resolved_image_url, filter)
+        _reject_system_targets(target_uri)
         viking_fs = self._ensure_initialized()
         result = await viking_fs.find(
             query=query,
@@ -225,7 +244,8 @@ class SearchService:
         from openviking.retrieve.skill_results import SkillResultResolver
         from openviking_cli.retrieve import ContextType, FindResult, TypedQuery
 
-        _ensure_non_empty_query(query)
+        _validate_query(query)
+        _reject_system_targets(target_uri)
         fs = self._ensure_initialized()
         targets = resolve_retrieval_targets(target_uri, ctx).target_directories
         for target in targets:

@@ -192,11 +192,11 @@ export default async function (pi: ExtensionAPI) {
         : [];
       if (config.takeoverEnabled) {
         takeover.restore(branch);
-        sync.restoreWatermark(takeover.state.syncedEntryCount);
+        sync.restoreWatermark(takeover.state.syncedEntryCount, branch);
       } else {
         // Local fork: additive mode keeps its own persisted capture watermark.
         // Without it, every `pi -c` process would resend the full branch.
-        sync.restoreWatermark(restoreAdditiveSyncWatermark(branch));
+        sync.restoreWatermark(restoreAdditiveSyncWatermark(branch), branch);
       }
 
       await sync.replayPending();

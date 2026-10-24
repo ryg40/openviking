@@ -300,21 +300,21 @@
       "nodes": [
         {
           "id": "http", "group": "api", "label": "HTTP server", "sub": "FastAPI + uvicorn",
-          "summary": "create_app builds the FastAPI app with the REST routers under /api/v1, the /mcp route and the Studio routes. bootstrap.py parses the arguments and runs uvicorn on port 1933.",
+          "summary": "create_app builds the REST, MCP and Studio routes. Optional embedded Gateway uses /gateway on the server port; the kit keeps it disabled. bootstrap.py runs uvicorn on port 1933.",
           "files": ["openviking/server/app.py", "openviking/server/bootstrap.py", "openviking/server/routers/", "openviking_cli/server_bootstrap.py"],
           "keys": ["server.host", "server.port", "server.workers", "server.cors_origins", "server.public_base_url"],
           "value": "{{runtime.public_base_url}}",
           "drill": {"view": "runtime", "node": "server", "label": "Show in the runtime view"}
         },
         {
-          "id": "mcp", "group": "api", "label": "/mcp endpoint", "sub": "20 MCP tools",
-          "summary": "A stateless FastMCP app is mounted at /mcp. An identity middleware uses the same resolve_identity as the REST API. The tools call the same services: find, search, read, write, edit, remember, add_resource, grep, glob and more.",
+          "id": "mcp", "group": "api", "label": "/mcp endpoint", "sub": "24 MCP tools",
+          "summary": "A stateless FastMCP app mounts at /mcp. Its middleware refuses root API keys; use a user or admin key. Tools share REST services and include privacy tree, resolve and upsert operations.",
           "files": ["openviking/server/mcp_endpoint.py"],
           "keys": ["oauth.enabled"]
         },
         {
           "id": "auth", "group": "api", "label": "Authentication", "sub": "{{conf.auth_mode}}",
-          "summary": "An auth plugin resolves the identity of each request from X-API-Key or a bearer token. The root key manages accounts, and user keys are stored in RAGFS. Auth plugins exist for api_key, trusted, dev, oidc and ldap.",
+          "summary": "An auth plugin resolves X-API-Key or bearer-token identity. The root key manages accounts. Account Store keeps identities and credentials, using file storage by default or optional MySQL-backed providers.",
           "files": ["openviking/server/auth/", "openviking/server/api_keys/new.py", "openviking/server/identity.py", "openviking/server/config.py"],
           "keys": ["server.auth_mode", "server.root_api_key", "server.oidc", "server.ldap", "oauth"],
           "value": "{{conf.auth_mode}}"
@@ -367,8 +367,9 @@
         },
         {
           "id": "tasks", "group": "services", "label": "TaskTracker", "sub": "state of async jobs",
-          "summary": "The task tracker records each asynchronous job and its state in a persistent store. Callers with wait=true and the /api/v1/tasks routes read it.",
-          "files": ["openviking/service/task_tracker.py", "openviking/service/task_store.py", "openviking/server/routers/tasks.py"]
+          "summary": "TaskTracker records tasks and queue work with their identity, state and execution events. Storage defaults to files; MySQL is optional. Waiters and /api/v1/tasks read the same store.",
+          "files": ["openviking/service/task_tracker.py", "openviking/service/task_store.py", "openviking/service/task_store_mysql.py", "openviking/server/routers/tasks.py"],
+          "keys": ["storage.task_store.provider", "service_name"]
         },
         {
           "id": "others", "group": "services", "label": "Other services", "sub": "watch, compile, deletion",
@@ -398,8 +399,9 @@
         },
         {
           "id": "sess", "group": "sessions", "label": "Session", "sub": "two-phase commit",
-          "summary": "A Session records messages and usage. A commit archives the messages under a path lock in the first phase and queues the rest. The second phase writes the archive summary and extracts memories.",
-          "files": ["openviking/session/session.py", "openviking/session/archive_store.py"]
+          "summary": "A Session records messages and usage. Commit archives messages and queues long-term memory extraction. Working Memory summaries default off; callers must enable them explicitly.",
+          "files": ["openviking/session/session.py", "openviking/session/archive_store.py"],
+          "keys": ["session.memory_policy.working_memory.enabled"]
         },
         {
           "id": "compressor", "group": "sessions", "label": "SessionCompressorV3", "sub": "extraction driver",
@@ -437,7 +439,7 @@
         },
         {
           "id": "queues", "group": "ingest", "label": "QueueManager", "sub": "named QueueFS queues",
-          "summary": "QueueManager runs named queues on the QueueFS plugin of RAGFS: AddResource, ExternalParse, Semantic, Embedding, SessionCommit, Reindex, ExternalTask and UserDeletion. Work is complete when no message is pending or in processing.",
+          "summary": "QueueManager runs AddResource, ExternalParse, Semantic, Embedding, ContentWrite, SessionCommit, Reindex, ExternalTask and UserDeletion queues on RAGFS. TaskTracker joins task state with owned queue work.",
           "files": ["openviking/storage/queuefs/queue_manager.py", "openviking/storage/queuefs/add_resource_processor.py", "openviking/storage/queuefs/session_commit_processor.py", "docs/en/concepts/16-queue-lifecycle.md"],
           "keys": ["storage.agfs.queuefs.backend", "queue_workers"],
           "value": "{{queue.value}}"
@@ -497,11 +499,11 @@
         {"from": "http", "to": "core", "type": "call", "label": "REST routers",
           "detail": "The routers under openviking/server/routers/ call the services of the OpenVikingService object."},
         {"from": "mcp", "to": "core", "type": "call", "label": "MCP tools",
-          "detail": "The 20 MCP tools call the same services as the routers."},
+          "detail": "The 24 MCP tools call the same services as the routers."},
         {"from": "observ", "to": "ragfs", "type": "call", "label": "/ready probes",
           "detail": "/ready probes RAGFS, the vector index and the API key manager."},
-        {"from": "auth", "to": "ragfs", "type": "store", "label": "user keys",
-          "detail": "APIKeyManager keeps the account and user key records in RAGFS under the system paths."},
+        {"from": "auth", "to": "ragfs", "type": "store", "label": "file Account Store",
+          "detail": "The default file Account Store keeps identity and credential records in RAGFS. Optional MySQL-backed providers use separate storage."},
         {"from": "core", "to": "fs", "type": "call", "label": "files"},
         {"from": "core", "to": "search", "type": "call", "label": "find, search"},
         {"from": "core", "to": "session", "type": "call", "label": "sessions"},
@@ -626,13 +628,13 @@
         },
         {
           "id": "commit", "title": "Session commit",
-          "summary": "A commit archives the messages in the first phase. A queued second phase summarizes the archive and extracts memories.",
+          "summary": "A commit archives messages in the first phase. A queued second phase extracts memories and generates Working Memory only when enabled.",
           "steps": [
             {"node": "http", "title": "Request", "label": "POST .../commit", "text": "A client sends POST /api/v1/sessions/{id}/commit."},
             {"node": "session", "title": "SessionService", "label": "commit_async", "text": "SessionService.commit_async calls Session.commit_async."},
             {"node": "sess", "title": "First phase", "label": "lock + split", "text": "The session takes a path lock and splits the messages into archived and retained messages."},
             {"node": "vikingfs", "title": "Write the archive", "label": "archive + markers", "text": "ArchiveStore writes the archive and the phase marker through VikingFS."},
-            {"node": "queues", "title": "Queue the second phase", "label": "SessionCommit", "text": "The session puts a SessionCommit message on the queue and creates a task."},
+            {"node": "queues", "title": "Queue the second phase", "label": "SessionCommit", "text": "The session creates the task with its identity before it puts a SessionCommit message on the queue."},
             {"node": "sess", "title": "Second phase", "label": "resume_queued_commit", "text": "SessionCommitProcessor calls Session.resume_queued_commit."},
             {"node": "vlmc", "title": "Archive summary", "label": "L0 + L1", "text": "The VLM writes the L0 and L1 summary of the archive."},
             {"node": "compressor", "title": "Start extraction", "label": "extract_long_term_memories", "text": "SessionCompressorV3 starts the long-term memory extraction."},
@@ -882,7 +884,7 @@
     {"view": "runtime", "node": "ingress", "title": "How a request arrives", "text": "Remote clients reach the server through the ingress proxy and an external Docker network. Clients on the host can use the published loopback port."},
     {"view": "runtime", "node": "server", "title": "One container, two processes", "text": "openviking-entrypoint starts openviking-server, and the server starts VikingBot as a child process. Double-click the node, or use the button in the panel, to drill down."},
     {"view": "runtime", "node": "state", "title": "All state in one bind mount", "text": "ov.conf and the stored context live in ./data on the host. Back it up before each image change."},
-    {"view": "internals", "node": "core", "title": "The service layer", "text": "The REST routers and the 20 MCP tools call one OpenVikingService object. It holds the services for files, search, sessions, resources, packs and debug."},
+    {"view": "internals", "node": "core", "title": "The service layer", "text": "The REST routers and the 24 MCP tools call one OpenVikingService object. It holds the services for files, search, sessions, resources, packs and debug."},
     {"view": "internals", "node": "vikingfs", "title": "Content and index", "text": "VikingFS maps viking:// URIs to RAGFS files. The vector index holds the vectors and the abstracts for retrieval."},
     {"view": "flows", "flow": "add", "step": 0, "title": "Follow a data flow", "text": "The flow view marks the nodes of one flow, step by step. Use Next, the step list or the arrow keys."},
     {"view": "repository", "node": "portable", "title": "From private branch to public release", "text": "Changes merge into local-dev. scripts/promote.sh copies its tree to portable after the checks on the edge pass. Select an edge to see its checks."},

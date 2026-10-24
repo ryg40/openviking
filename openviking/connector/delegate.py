@@ -26,7 +26,12 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from openviking.connector.auth import OAUTH_REF_ARG, project_auth_config
+from openviking.connector.auth import (
+    OAUTH_REF_ARG,
+    confluence_auth_config,
+    document_auth_config,
+    project_auth_config,
+)
 from openviking.connector.client import ConnectorClient
 from openviking.connector.routing import (
     CONNECTOR_ARGS_AUTH_CONFIG_KEY,
@@ -39,6 +44,7 @@ from openviking.connector.routing import (
 from openviking.core.namespace import NamespaceShapeError
 from openviking.core.uri_validation import matches_content_kind
 from openviking.crypto.encryptor import MAGIC as ENCRYPTED_ENVELOPE_MAGIC
+from openviking.metrics.datasources.resource import ResourceIngestionEventDataSource
 from openviking.observability.http_error_context import (
     sanitize_public_error_details,
     sanitize_public_http_error,
@@ -50,6 +56,7 @@ from openviking.resource.processing_mode import (
     ProcessingMode,
 )
 from openviking.server.identity import RequestContext
+from openviking.service.task_domain import TaskPatch
 from openviking.utils.tags import normalize_search_tags
 from openviking_cli.exceptions import InternalError, InvalidArgumentError
 from openviking_cli.utils import get_logger
@@ -57,6 +64,7 @@ from openviking_cli.utils import get_logger
 logger = get_logger(__name__)
 
 _TOS_BUCKET_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$")
+CONNECTOR_DISPLAY_RESOURCE_CONFIG_ARG = "resource_config"
 
 
 def _safe_http_response(response: httpx.Response) -> Any:
@@ -467,7 +475,9 @@ class ConnectorDelegate:
             supported_args = CONNECTOR_SUPPORTED_ARGS.get(
                 add_type, frozenset()
             ) | CONNECTOR_CREDENTIAL_ARGS.get(add_type, frozenset())
-            unknown_args = sorted(set(connector_args) - supported_args)
+            unknown_args = sorted(
+                set(connector_args) - supported_args - {CONNECTOR_DISPLAY_RESOURCE_CONFIG_ARG}
+            )
             if unknown_args:
                 supported_hint = (
                     f"supported: {sorted(supported_args)}"
@@ -553,10 +563,14 @@ class ConnectorDelegate:
             # semantics, so they travel wholesale through param_config. The
             # caller supplies credentials under the reserved args.auth_config
             # key, lifted into the top-level auth_config field.
+            display_only_args = {
+                CONNECTOR_ARGS_AUTH_CONFIG_KEY,
+                CONNECTOR_DISPLAY_RESOURCE_CONFIG_ARG,
+            }
             forwarded_args = {
                 key: value
                 for key, value in (connector_args or {}).items()
-                if key != CONNECTOR_ARGS_AUTH_CONFIG_KEY and value is not None
+                if key not in display_only_args and value is not None
             }
             declared_auth = (connector_args or {}).get(CONNECTOR_ARGS_AUTH_CONFIG_KEY)
             if declared_auth is not None and not isinstance(declared_auth, dict):
@@ -569,6 +583,12 @@ class ConnectorDelegate:
 
         if add_type in {"meego", "feishu_project"} and OAUTH_REF_ARG in (connector_args or {}):
             auth_config = await project_auth_config(connector_args or {}, ctx)
+            forwarded_args.pop(OAUTH_REF_ARG, None)
+        if add_type == "feishu_doc" and OAUTH_REF_ARG in (connector_args or {}):
+            auth_config = await document_auth_config(connector_args or {}, ctx)
+            forwarded_args.pop(OAUTH_REF_ARG, None)
+        if add_type == "confluence" and OAUTH_REF_ARG in (connector_args or {}):
+            auth_config = await confluence_auth_config(connector_args or {}, ctx)
             forwarded_args.pop(OAUTH_REF_ARG, None)
 
         tos_path: Optional[str] = None
@@ -683,6 +703,11 @@ class ConnectorDelegate:
                 raise InternalError(
                     f"Connector accepted the import but returned no task key: {result}"
                 )
+            ResourceIngestionEventDataSource.record_import(
+                pipeline="connector",
+                source_type="repository" if add_type == "git" else "document",
+                account_id=ctx.account_id,
+            )
             # Never log api_key / auth_config / param_config values here.
             logger.info(
                 "[ConnectorDelegate] Connector import accepted: add_type=%s to=%s "
@@ -853,9 +878,9 @@ class ConnectorDelegate:
                     )
                     last_status = status
 
-                await task_tracker.update_stage(
+                await task_tracker.patch_task(
                     ov_task_id,
-                    f"connector:{status}",
+                    TaskPatch(stage=f"connector:{status}"),
                     account_id=ctx.account_id,
                     user_id=ctx.user.user_id,
                 )
@@ -884,7 +909,6 @@ class ConnectorDelegate:
                                 ctx=ctx,
                                 reason=reason,
                                 source_name=None,
-                                timeout=None,
                             )
                             for key in ("memory_linking", "warnings"):
                                 if key in link_result:

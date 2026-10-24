@@ -13,7 +13,7 @@ from openviking.pyagfs.exceptions import AGFSNotSupportedError
 from openviking.server.identity import RequestContext
 from openviking.storage.expr import And, PathScope, RawDSL
 from openviking.storage.viking_fs._base import logger
-from openviking_cli.exceptions import PermissionDeniedError
+from openviking_cli.exceptions import InvalidArgumentError, PermissionDeniedError
 from openviking_cli.utils.config.grep_config import GrepEngine
 
 _GREP_LS_PAGE_SIZE = 1000
@@ -42,6 +42,7 @@ class _GrepMixin:
         include_tags: bool = False,
         before_context: int = 0,
         after_context: int = 0,
+        force_fs: bool = False,
     ) -> Dict:
         """Content search by pattern or keywords.
 
@@ -84,7 +85,7 @@ class _GrepMixin:
         # persisted raw content, so it cannot safely recall projected results.
         resolved_engine = (
             "fs"
-            if content_transform is not None or is_session_uri(uri)
+            if force_fs or content_transform is not None or is_session_uri(uri)
             else await self._resolve_grep_engine(engine, uri, ctx, switch_to_remote_threshold)
         )
         tags_by_uri: Dict[str, List[str]] = {}
@@ -112,35 +113,38 @@ class _GrepMixin:
                 if record.get("uri")
             }
 
-        if resolved_engine == "fs":
-            result = await self._grep_fs(
-                uri=uri,
-                pattern=pattern,
-                exclude_uri=exclude_uri,
-                case_insensitive=case_insensitive,
-                node_limit=node_limit,
-                level_limit=level_limit,
-                ctx=ctx,
-                content_transform=content_transform,
-                allowed_uris=allowed_uris,
-                before_context=before_context,
-                after_context=after_context,
-            )
-        else:  # "vikingdb_then_fs"
-            result = await self._grep_vikingdb_then_fs(
-                uri=uri,
-                pattern=pattern,
-                exclude_uri=exclude_uri,
-                case_insensitive=case_insensitive,
-                node_limit=node_limit,
-                level_limit=level_limit,
-                ctx=ctx,
-                allowed_uris=allowed_uris,
-                tag_filter=tag_filter,
-                include_tags=include_tags,
-                before_context=before_context,
-                after_context=after_context,
-            )
+        try:
+            if resolved_engine == "fs":
+                result = await self._grep_fs(
+                    uri=uri,
+                    pattern=pattern,
+                    exclude_uri=exclude_uri,
+                    case_insensitive=case_insensitive,
+                    node_limit=node_limit,
+                    level_limit=level_limit,
+                    ctx=ctx,
+                    content_transform=content_transform,
+                    allowed_uris=allowed_uris,
+                    before_context=before_context,
+                    after_context=after_context,
+                )
+            else:  # "vikingdb_then_fs"
+                result = await self._grep_vikingdb_then_fs(
+                    uri=uri,
+                    pattern=pattern,
+                    exclude_uri=exclude_uri,
+                    case_insensitive=case_insensitive,
+                    node_limit=node_limit,
+                    level_limit=level_limit,
+                    ctx=ctx,
+                    allowed_uris=allowed_uris,
+                    tag_filter=tag_filter,
+                    include_tags=include_tags,
+                    before_context=before_context,
+                    after_context=after_context,
+                )
+        except re.error as exc:
+            raise InvalidArgumentError(f"Invalid grep pattern: {exc}") from exc
         return self._attach_grep_tags(result, tags_by_uri)
 
     async def _resolve_grep_engine(
