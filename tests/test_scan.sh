@@ -561,6 +561,54 @@ printf '.local/\n' >>"$fresh/.git/info/exclude"
 expect_status "baseline: a home pattern in an upstream file fails" 1 in_repo "$fresh" sh "$fs" --level fail tree
 expect_out "baseline: the home pattern is reported" "tests/home.md:1  rule host-value-local-2"
 
+echo "# historical portable baselines"
+historical=$work/historical
+new_repo "$historical"
+mkdir -p "$historical/scripts" "$historical/docs"
+cp "$tool/.gitleaks.toml" "$historical/"
+cp "$tool/scripts/scan.sh" "$tool/scripts/host-values.deny" "$tool/scripts/host-values.regex" \
+    "$historical/scripts/"
+cp "$work/baseline" "$historical/scripts/upstream-base"
+printf 'server: http://%s:8080/\n' "$ip10" >"$historical/docs/up.md"
+g -C "$historical" add .
+g -C "$historical" commit -q -m "portable: old upstream example"
+old_snapshot=$(g -C "$historical" rev-parse HEAD)
+g -C "$historical" rm -q docs/up.md
+grep -v '^hit	' "$historical/scripts/upstream-base" >"$work/next-baseline"
+cp "$work/next-baseline" "$historical/scripts/upstream-base"
+g -C "$historical" add .
+g -C "$historical" commit -q -m "portable: upstream removes example"
+hs=$historical/scripts/scan.sh
+expect_status "historical baseline: removed upstream example passes complete history" 0 \
+    in_repo "$historical" sh "$hs" --level fail history
+expect_out "historical baseline: old exact path and line are accepted" "1 finding(s) in upstream content accepted"
+printf 'server: http://%s:8080/\n' "$ip10" >"$historical/local.md"
+g -C "$historical" add .
+g -C "$historical" commit -q -m "local: copy at another path"
+expect_status "historical baseline: copied line at another path fails" 1 \
+    in_repo "$historical" sh "$hs" --level fail history
+expect_out "historical baseline: copied path is reported" "local.md:1  rule host-value-private-10"
+g -C "$historical" rm -q local.md
+g -C "$historical" commit -q -m "local: remove copied path"
+mkdir -p "$historical/docs"
+printf 'server: http://%s:9090/\n' "$ip10" >"$historical/docs/up.md"
+g -C "$historical" add .
+expect_status "historical baseline: tree cannot use an older baseline" 1 \
+    in_repo "$historical" sh "$hs" --level fail tree
+expect_out "historical baseline: current tree path is reported" "docs/up.md:1  rule host-value-private-10"
+g -C "$historical" commit -q -m "local: changed line"
+changed_snapshot=$(g -C "$historical" rev-parse HEAD)
+expect_status "historical baseline: changed line cannot use an older baseline" 1 \
+    in_repo "$historical" sh "$hs" --level fail history "$old_snapshot..$changed_snapshot"
+expect_out "historical baseline: changed history path is reported" "docs/up.md:1  rule host-value-private-10"
+mkdir -p "$historical/.local"
+cp "$local_deny" "$historical/.local/host-values.deny"
+printf '.local/\n' >>"$historical/.git/info/exclude"
+printf '%s\n' "$ip10" >>"$historical/.local/host-values.deny"
+expect_status "historical baseline: local deny rules have no historical exception" 1 \
+    in_repo "$historical" sh "$hs" --level fail history "$old_snapshot"
+expect_out "historical baseline: local rule is reported" "host-value-local-3"
+
 echo "# scripts/upstream-base without the upstream ref"
 # An uncommitted tag line that names a local commit must not turn local
 # content into upstream content when refs/upstream/tags/<tag> is absent.

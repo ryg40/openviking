@@ -81,6 +81,11 @@ A host-value finding of a tracked rule (`scripts/host-values.regex`, `scripts/ho
 
 Without the base commit (a shallow clone, or a branch without the upstream history), the scan uses the `hit` lines of `scripts/upstream-base`: a finding is accepted when its path and the Git blob id of its line (`git hash-object` of the line with its newline) are a `hit` line. `scripts/scan.sh baseline` writes these lines from the base tree. The file holds hashes and upstream paths, no address and no home value: the baseline uses the tracked rules only.
 
+For `history` without the base object, a finding can also match the scanned commit's own `scripts/upstream-base`.
+This fallback requires the exact `hit` entry for that path and line hash.
+It preserves upstream examples in older portable snapshots when later upstream versions remove their baseline entries.
+It never applies to `tree`, `staged`, secret rules or a different path or line.
+
 A rule of `.local/host-values.deny` (`host-value-local-<n>`) has no exception. A home value gives a finding in each file, upstream or local.
 
 Limits:
@@ -92,6 +97,8 @@ Limits:
 - The mode `image` has no exception.
 
 Negative controls (`tests/test_scan.sh`, section "upstream content"): an address in an upstream file is accepted; the same address in a local file fails; a changed upstream file fails; a home pattern in an upstream file fails; a copy of the upstream archive at another path fails; a changed archive fails; a tag ref with another commit is an error; an edited `tag` line without the ref is an error (`tree`, `history`), with the ref it is used as before (`tree`, `baseline`); a repository without `HEAD` runs `tree` and `staged`; the same checks without the base commit use the `hit` lines.
+
+Historical baseline controls also check removed examples, changed lines, copied paths, current-tree isolation and local deny rules.
 
 ### Upstream history
 

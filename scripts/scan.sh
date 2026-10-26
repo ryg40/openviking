@@ -684,7 +684,13 @@ accepted() {
                 else
                     [ -n "$3" ] || return 1
                     h=$(cat_copy "$kind" "$loc" | line_hash "$3")
-                    grep -qxF "$h	$2" "$work/upstream.hit" || return 1
+                    if ! grep -qxF "$h	$2" "$work/upstream.hit"; then
+                        # Older portable snapshots can retain upstream examples removed later.
+                        # Use only that scanned commit's exact path-and-line baseline.
+                        [ "$mode" = history ] && [ -n "$4" ] || return 1
+                        git show "$4:$UPSTREAM_REL" >"$work/historical-base" 2>/dev/null || return 1
+                        grep -qxF "hit	$h	$2" "$work/historical-base" || return 1
+                    fi
                 fi
                 ;;
         esac
