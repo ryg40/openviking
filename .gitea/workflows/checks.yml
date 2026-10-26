@@ -16,11 +16,11 @@ defaults:
   run:
     shell: sh
 env:
-  CI_REF: '${{ gitea.ref }}'
+  CI_REF: '${{ github.ref }}'
   SCAN_NAME_PREFIX: 'openviking-ci-'
-  CI_RUN: '${{ gitea.run_id }}'
-  CI_ATTEMPT: '${{ gitea.run_attempt }}'
-  SOURCE_URL: '${{ gitea.server_url }}/${{ gitea.repository }}'
+  CI_RUN: '${{ github.run_id }}'
+  CI_ATTEMPT: '${{ github.run_attempt }}'
+  SOURCE_URL: '${{ github.server_url }}/${{ github.repository }}'
 jobs:
   fast:
     runs-on: kit-amd64
@@ -31,9 +31,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          github-server-url: '${{ gitea.server_url }}'
-          repository: '${{ gitea.repository }}'
-          ref: '${{ gitea.sha }}'
+          github-server-url: '${{ github.server_url }}'
+          repository: '${{ github.repository }}'
+          ref: '${{ github.sha }}'
       - name: 'Require full history'
         run: |
           test "$(git rev-parse --is-shallow-repository)" = false
@@ -58,7 +58,7 @@ jobs:
           python3 -m unittest tests.test_update_propose
   build:
     needs: fast
-    if: "${{ gitea.event_name == 'pull_request' || (gitea.event_name == 'push' && (gitea.ref == 'refs/heads/local-dev' || startsWith(gitea.ref, 'refs/heads/sync/'))) }}"
+    if: "${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/local-dev' || startsWith(github.ref, 'refs/heads/sync/'))) }}"
     runs-on: kit-amd64
     timeout-minutes: 60
     steps:
@@ -67,9 +67,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          github-server-url: '${{ gitea.server_url }}'
-          repository: '${{ gitea.repository }}'
-          ref: '${{ gitea.sha }}'
+          github-server-url: '${{ github.server_url }}'
+          repository: '${{ github.repository }}'
+          ref: '${{ github.sha }}'
       - name: 'Upstream build baseline'
         run: |
           sh scripts/setup-remotes.sh

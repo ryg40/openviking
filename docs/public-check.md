@@ -142,8 +142,6 @@ Stage cells permit image names only, never digests.
 The scanner binary-version declaration must equal the version in its image reference.
 The generated upstream map is derived data, checked separately against the generator.
 No test file receives a whole-file exception.
-The locally regenerated dependency lock keeps exact upstream Jiter metadata lines whose version equals the independent uv tool version.
-Each permitted line has its own content hash; changed metadata fails, and no whole-lockfile exception applies.
 
 After a tag, digest or scanner pin change, change nothing in the documents.
 Run `sh scripts/public-check.sh` and `sh tests/test_public_check.sh`.

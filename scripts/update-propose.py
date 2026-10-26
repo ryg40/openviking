@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish one qualified development update from the workflow's environment inputs."""
+"""Publish one qualified update, optionally merging safe upstream tags into local-dev."""
 
 import base64
 import hashlib
@@ -184,6 +184,10 @@ class Dispatcher:
             "GIT_CONFIG_NOSYSTEM": "1",
             "GIT_CONFIG_GLOBAL": os.devnull,
             "GIT_TERMINAL_PROMPT": "0",
+            "GIT_AUTHOR_NAME": "OpenViking updates",
+            "GIT_AUTHOR_EMAIL": "update@example.invalid",
+            "GIT_COMMITTER_NAME": "OpenViking updates",
+            "GIT_COMMITTER_EMAIL": "update@example.invalid",
         }
         if credentials:
             url, _ = self.server()
@@ -209,6 +213,75 @@ class Dispatcher:
             output.write_bytes(result.stdout)
             output.with_suffix(".stderr.log").write_bytes(result.stderr)
         return result.returncode
+
+    def auto_merge(self, item, qualification, notes):
+        enabled = self.environ.get("UPDATE_AUTO_MERGE", "false")
+        require(enabled in ("true", "false"), "invalid automatic merge setting")
+        return (
+            enabled == "true"
+            and item["kind"] == "upstream-tag"
+            and qualification.get("status") == "passed"
+            and qualification.get("attention") is False
+            and qualification.get("manual_steps") == []
+            and qualification.get("conflicts") == []
+            and bool(qualification.get("steps"))
+            and all(step.get("status") in ("passed", "resolved", "skipped")
+                    for step in qualification["steps"])
+            and notes.get("status") == "passed"
+            and notes.get("attention") is False
+            and notes.get("breaking_section") is False
+        )
+
+    def merge_upstream(self, item, qualification, work):
+        prerequisite = qualification["prerequisite_commit"]
+        source = (work / "source-head.log").read_text().strip()
+        require(prerequisite == source, "qualification source does not match checkout")
+        tip_log = work / "qualified-head.log"
+        require(
+            self.invoke(["git", "rev-parse", "refs/heads/" + item["branch"]], tip_log) == 0,
+            "qualified commit is unavailable",
+        )
+        tip = tip_log.read_text().strip()
+        require(re.fullmatch(r"[0-9a-f]{40}", tip), "invalid qualified commit")
+        require(
+            self.invoke(
+                ["git", "merge-base", "--is-ancestor", prerequisite, tip],
+                work / "qualified-ancestry.log",
+            ) == 0,
+            "qualified commit does not contain source",
+        )
+        current = self.request("GET", "/branches/local-dev")
+        require(
+            current and (current.get("commit") or {}).get("id") == prerequisite,
+            "development branch changed; qualify again",
+        )
+        merge_log = work / "merge-commit.log"
+        # Preserve the tested tree and both parents without executing fetched Git hooks.
+        require(
+            self.invoke(
+                ["git", "commit-tree", tip + "^{tree}", "-p", prerequisite, "-p", tip,
+                 "-m", "Merge upstream " + item["to"] + " into local-dev"],
+                merge_log,
+            ) == 0,
+            "cannot create integration commit",
+        )
+        merge = merge_log.read_text().strip()
+        require(re.fullmatch(r"[0-9a-f]{40}", merge), "invalid integration commit")
+        url, repo = self.server()
+        # A normal, object-pinned push rejects any concurrent divergent base update.
+        require(
+            self.invoke(
+                ["git", "push", url + "/" + repo + ".git", merge + ":refs/heads/local-dev"],
+                work / "merge-push.log", credentials=True,
+            ) == 0,
+            "integration push failed; inspect remote before retry",
+        )
+        current = self.request("GET", "/branches/local-dev")
+        require(
+            current and (current.get("commit") or {}).get("id") == merge,
+            "integration result is uncertain; inspect remote",
+        )
+        return "merged"
 
     def publish(self, item, qualification, notes, ready, work):
         # Repeat lookups after qualification and before each publication boundary.
@@ -252,6 +325,8 @@ class Dispatcher:
             )
         if self.existing(item):
             return "existing"
+        if self.auto_merge(item, qualification, notes):
+            return self.merge_upstream(item, qualification, work)
         url, repo = self.server()
         # One explicit candidate refspec; no force, tag following or release branch.
         require(

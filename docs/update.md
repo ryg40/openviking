@@ -5,12 +5,14 @@ It uses Python 3 and its standard library. It prints one JSON result on standard
 A qualification never changes the caller's checkout, pushes a branch, or promotes a release.
 
 The [development update workflow](ci.md#development-update-workflow) runs `detect` daily and qualifies at most one unhandled candidate per run.
-It opens a development pull request on success or an issue after failed qualification or notes.
-`scripts/update-propose.py` publishes the proposal.
+It merges a fully qualified upstream tag into `local-dev` when the release needs no manual review.
+Updates with attention flags and independent pin updates remain development pull requests.
+Failed qualification or notes create an issue.
+`scripts/update-propose.py` integrates the update or publishes the proposal.
 Run bundles and logs hold development content and stay private.
 See [CI](ci.md#development-update-workflow) for the token, evidence and schedule requirements.
 
-Warning: the proposal script can push a development branch. The qualification command never publishes a branch.
+Warning: the dispatcher can push `local-dev` when `UPDATE_AUTO_MERGE=true`. It never changes `portable` or release tags.
 
 Warning: qualification executes fetched source and build definitions. Use a disposable runner for untrusted upstream releases.
 
@@ -65,8 +67,9 @@ The sync-table check rejects unlisted local changes to upstream files.
 
 After a clean merge, qualification updates the upstream tag and generates scan baseline entries.
 It then regenerates the upstream blob map with the public-check command.
-It runs the tree scan, five shell suites, and the update command unit tests.
-The shell suites cover remote setup, promotion, build versions, scanner behavior, and the public check.
+It runs the tree scan, six shell suites, and both update test modules.
+The shell suites cover remote setup, promotion, build versions, scanner behavior, the public check, and workflows.
+The dispatcher tests also exercise real Git merge ancestry and a concurrent remote update.
 It then runs build tests, gateway build, image tests, Compose tests, and layer scan.
 Qualification runs the cloned candidate's update tests. A missing test module fails that step.
 It runs Pi and shared-library tests when their paths change. These tests need Node 24 or later and `zip`.

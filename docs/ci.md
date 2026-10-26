@@ -13,6 +13,8 @@ Promotion stays manual, with separate approval for creation and publication; see
 | `.github/workflows/checks.yml` | Push of `portable`, push of a portable release tag, any pull request, or manual dispatch | Fast checks; the build runs only on manual dispatch |
 | `.gitea/workflows/upstream-update.yml` | Daily at 03:17 UTC and manual dispatch on `local-dev` | Detect candidates, then qualify and propose one unhandled value |
 
+The development workflows in `.gitea/workflows/` support Gitea and Forgejo with the same files.
+They use the shared `github` context and `secrets.GITHUB_TOKEN` job token name.
 Neither checks workflow has a schedule. The update workflow is the only scheduled workflow.
 
 After successful fast checks, the development build runs for pushes of `local-dev` and `sync/*`, including nested sync branches.
@@ -27,9 +29,9 @@ Enable Actions and register a runner on your server. Without a runner, no job st
 
 ## Runner needs
 
-Use a disposable Linux runner on `amd64` with the label `kit-amd64` for the Gitea workflows.
+Use a disposable Linux runner on `amd64` with the label `kit-amd64` for the development workflows.
 The GitHub workflow uses the hosted `ubuntu-latest` Linux runner.
-The Gitea workflows use their own label because an instance may have an `ubuntu-latest` runner without the required tools.
+The development workflows use their own label because an instance may have an `ubuntu-latest` runner without the required tools.
 Provide these tools in the job environment:
 
 - Git, POSIX `sh`, Python 3.9 or later, and common Linux tools such as `awk`, `sed`, `tar` and `od`.
@@ -49,7 +51,7 @@ The pinned actions declare these runtimes in `runs.using` of their action.yml fi
 | [upload-artifact v3.2.2](https://raw.githubusercontent.com/actions/upload-artifact/c6a366c94c3e0affe28c06c8df20a878f24da3cf/action.yml) | `node24` |
 | [download-artifact v3.0.2](https://raw.githubusercontent.com/actions/download-artifact/9bc31d5ccc31df68ecc42ccf4149144866c47d8a/action.yml) | `node16` |
 
-The runner (`act_runner` or the GitHub runner) must execute `node24` actions.
+The runner (`act_runner`, Forgejo Runner or the GitHub runner) must execute `node24` actions.
 The Node setup action selects the test runtime; it does not add action-runtime support to the runner.
 Version 0.2.11 of `act_runner` refuses a job with a `node24` action before its first step.
 Version 0.6.1 of `act_runner` executes the four pinned actions.
@@ -114,21 +116,24 @@ The development build condition uses event names, ref equality and the `startsWi
 The public file also uses manual dispatch and a job condition on the event name.
 All action references use full commit hashes and version comments.
 Checks use only checkout and Node setup; the update workflow also uses artifact upload and download.
-Artifact actions use the v3 protocol for Gitea compatibility, not GitHub's v4 artifact service.
+Artifact actions use the v3 protocol for Gitea and Forgejo compatibility, not GitHub's v4 artifact service.
 Update jobs also use job outputs, `always()` for evidence, standard-library Python scripts and a concurrency group.
 Confirm these features on your server before you enable the schedule.
 
-| Feature | Gitea | GitHub |
+| Feature | Gitea and Forgejo | GitHub |
 | --- | --- | --- |
-| Workflow directory | Reads the Gitea directory first and ignores the GitHub directory when it exists | Reads the GitHub directory only |
-| Context | Explicit Gitea server, repository, ref and run values | GitHub server, repository, ref and run values |
+| Workflow directory | Reads `.gitea/workflows/`; Forgejo checks its own workflow directory first | Reads the GitHub directory only |
+| Context | Shared `github` context supplies the current server, repository, ref and run values | GitHub server, repository, ref and run values |
 | Action source | Absolute public GitHub action URL avoids the server's default action-host setting | Standard action repository syntax |
 | Pull-request ref | Head ref, not a preview merge commit | Preview merge ref |
 | Permissions | Support and token scope depend on the server and runner version | Top-level contents-read permission disables other token scopes |
 | Runner label | `kit-amd64` selects the required Linux environment | `ubuntu-latest` selects the hosted Linux environment |
 
-The development checkout passes the server URL, repository name and event commit from the Gitea context.
+The development checkout passes the server URL, repository name and event commit from the shared `github` context.
+This context names the current Gitea or Forgejo server, not GitHub.
 Both checkouts set full history and disable persistent credentials.
+The update workflow uses `runner.temp` only in step environments and action inputs.
+Forgejo does not permit the `runner` context in workflow-level or job-level `env`.
 Each scan receives `SCAN_REF` from the runner ref stored in `CI_REF`; the shell test suites do not inherit it.
 Host values warn on private refs, while secret and policy findings fail.
 The public scanner explicitly uses fail level for both tree and complete checked-out history.
@@ -136,22 +141,28 @@ A public pull request scans its preview merge history; portable pushes scan the 
 The public checker runs immediately after the scans and stops the job on a finding.
 On a portable clone it reads the generated upstream blob map without fetching upstream objects.
 
-See the [Gitea comparison](https://docs.gitea.com/usage/actions/comparison/) and [Gitea FAQ](https://docs.gitea.com/usage/actions/faq/).
-Gitea 1.26.1 with `act_runner` 0.6.1 runs these features of the Gitea workflows: checkout, job conditions, job outputs, the schedule, manual dispatch and the artifact actions.
-Not verified: permission enforcement, pull-request events from a person and the concurrency group on that server.
+See the [Gitea comparison](https://docs.gitea.com/usage/actions/comparison/) and [Gitea FAQ](https://docs.gitea.com/1.26/usage/actions/faq/).
+The FAQ confirms that `github` and `gitea` contexts have the same effect.
+The [Forgejo reference](https://forgejo.org/docs/v17.0/user/actions/reference/#contexts) defines `github` as an alias of `forgejo`.
+It also lists the permitted locations for each context.
+Forgejo Runner 13.2.0 accepts both development files with its offline workflow schema validator.
+This check does not execute jobs or prove action-runtime support.
+Not verified: action execution, token rights, pull-request events, artifact transfer or concurrency on Forgejo.
+Gitea 1.26.1 with `act_runner` 0.6.1 runs checkout, job conditions, job outputs, the schedule, manual dispatch and the artifact actions.
+Not verified: permission enforcement, pull-request events from a person and the concurrency group on that Gitea version.
 Not verified: these features on other server and runner versions.
 
 ## Development update workflow
 
 The update workflow never runs from a pull request or a push.
-Gitea schedules read the repository's default branch, which must be `local-dev` to use this file.
+Gitea and Forgejo schedules read the repository's default branch, which must be `local-dev` to use this file.
 If another default branch is required, leave the schedule disabled and dispatch manually from `local-dev`.
 Both jobs refuse other refs. Changing the default branch needs your server's approval process.
 
 | Job | Stages | Token and evidence |
 | --- | --- | --- |
 | `detect` | Read public candidate sources; treat exit 10 as proposals and exit 0 as no update | Read-only checkout token; upload `update-detection` and set the boolean job output |
-| `qualify` | Download detection; run `scripts/update-propose.py` to qualify, read notes and publish one unhandled candidate | Publication token only in the dispatcher; upload `update-evidence` even on failure |
+| `qualify` | Download detection; qualify, read notes and integrate or propose one unhandled candidate | Publication token only in the dispatcher; upload `update-evidence` even on failure |
 
 The detection artifact carries the complete JSON result between jobs.
 The job output carries only whether complete detection proposes an update.
@@ -168,7 +179,20 @@ It runs `notes` only after an upstream-tag qualification passes.
 A notes failure prevents a pull request, even when qualification passed.
 
 On success, the dispatcher verifies the bundle prerequisite, verifies the bundle, and imports its one candidate branch.
-It pushes one explicit branch refspec without force or automatic tag following.
+The daily workflow sets `UPDATE_AUTO_MERGE=true` for upstream tags only.
+A passing qualification and passing notes must have no conflicts, manual steps, attention flags or breaking-change section.
+Otherwise, the dispatcher keeps the candidate as a pull request for manual review.
+Pin updates always remain pull requests.
+
+Before an automatic merge, the dispatcher confirms that the qualification starts at the event checkout.
+It also confirms that remote `local-dev` still names that exact source commit.
+It creates a two-parent merge commit with the tested tree and pushes its exact object ID to `local-dev`.
+A normal push rejects concurrent divergent changes; no force option or branch deletion applies.
+A final API read must confirm the exact integration commit.
+An uncertain push or verification fails without a retry; inspect the remote before another run.
+The dispatcher never promotes `portable`, creates release tags or deploys a service.
+
+For a proposal, it pushes one explicit candidate branch refspec without force or automatic tag following.
 Upstream branches use `sync/<tag>`; pins use `topic/pin-<kind>`.
 The pull request targets `local-dev`, never `portable`.
 On Gitea 1.26.1, a branch push or a pull request that the runner token makes starts no run of the checks workflow.
@@ -195,15 +219,20 @@ Bundles and logs contain development history and must not become public release 
 
 ### Token and publication rights
 
-Gitea supplies the repository job token through `secrets.GITEA_TOKEN`.
-The dispatcher uses `secrets.UPDATE_TOKEN || secrets.GITEA_TOKEN`, so a named secret overrides the runner token without step changes.
+Gitea and Forgejo supply the repository job token through `secrets.GITHUB_TOKEN`.
+The workflow maps `secrets.UPDATE_TOKEN || secrets.GITHUB_TOKEN` to the dispatcher's `UPDATE_TOKEN` input.
+A named secret overrides the runner token without step changes.
+The dispatcher uses only the `UPDATE_*` environment inputs, not server-specific context or secret names.
+The token aliases are defined in [Gitea's task secrets](https://raw.githubusercontent.com/go-gitea/gitea/v1.26.1/models/secret/secret.go).
+[Forgejo's task secrets](https://codeberg.org/forgejo/forgejo/src/tag/v17.0.0/services/actions/secret.go) also define the `GITHUB_TOKEN` alias.
+These source definitions prove the name, not publication rights.
 Detection requests only contents-read permission.
 Qualification requests contents-write, pull-requests-write and issues-write permissions for branch pushes and proposal API calls.
 No package, administration or provider permission is requested.
 
 On Gitea 1.26.1, the runner token reads the open proposals and creates the failure issue.
 With no `UPDATE_TOKEN` secret on that version, it also pushes the candidate branch and opens the pull request.
-Not verified: the runner-token rights on other Gitea versions.
+Not verified: the runner-token rights on Forgejo or other Gitea versions.
 If necessary, create `UPDATE_TOKEN` with write access only to this development repository's code, pull requests and issues.
 Keep the token in the repository secret store, not in a file or URL.
 The dispatcher passes it only to API calls and the authenticated Git push.
@@ -221,7 +250,7 @@ They match the candidate branch, the exact title without the attention mark, or 
 An existing remote candidate branch also prevents replacement.
 
 Confirm workflow serialization before enabling scheduled runs. Do not run another proposal writer concurrently.
-If your Gitea version ignores concurrency, use a dedicated single-job runner and prevent overlapping dispatches.
+If your server ignores concurrency, use a dedicated single-job runner and prevent overlapping dispatches.
 These controls require one serialized writer; the API does not enforce unique issue titles.
 Manual duplicate proposals and unsupported runner concurrency can bypass that boundary.
 
@@ -256,8 +285,9 @@ The command actions need no publication token.
    ```
 
 Review the result before importing a bundle or publishing a development proposal.
-The workflow calls `python3 scripts/update-propose.py` for API lookups, bundle import and candidate-only publication.
-These actions do not approve a merge or a portable promotion.
+The workflow calls `python3 scripts/update-propose.py` for API lookups, bundle import, integration and proposal publication.
+Manual dispatcher runs default to proposal-only behavior when `UPDATE_AUTO_MERGE` is absent.
+These actions never approve a portable promotion.
 
 You can run the same script against a test development repository with four environment variables.
 Use its clean, full-history checkout, matching `HEAD` and `local-dev`, and a detection result with exit code 10.
@@ -269,6 +299,7 @@ Provide the qualification tools, disposable Docker state, disk space and network
 | `UPDATE_SERVER` | HTTPS Git server URL without credentials, query or fragment |
 | `UPDATE_REPOSITORY` | Test repository in owner/repository format |
 | `UPDATE_TOKEN` | Repository-scoped token with code, pull-request and issue write access |
+| `UPDATE_AUTO_MERGE` | Optional `true` or `false`; defaults to `false`; integrates safe upstream tags into `local-dev` |
 
 Set the variables in your shell and export them; load the token from your secret store.
 The script takes no command-line options.
@@ -281,7 +312,7 @@ python3 scripts/update-propose.py
 Exit 0 means successful processing or no unhandled candidate; exit 1 means a failed candidate or processing error.
 Inspect dispatch.json and the qualification records before reviewing the proposal.
 
-Warning: this script pushes a candidate branch and creates a pull request or issue. Use a disposable test repository.
+Warning: this script pushes development branches and can merge upstream updates. Use a disposable test repository.
 
 To turn the schedule off, remove the schedule event and keep `workflow_dispatch`.
 Manual dispatch still requires the `local-dev` ref and a registered runner.
@@ -414,6 +445,16 @@ Warning: an image push must start from a `portable-v*` release tag only. Other r
 
 ## Workflow test limits
 
+With Forgejo Runner 13.2.0 installed, validate each development workflow offline:
+
+```sh
+forgejo-runner validate --workflow --path .gitea/workflows/checks.yml
+forgejo-runner validate --workflow --path .gitea/workflows/upstream-update.yml
+```
+
+The `--path` option checks the named file; directory discovery searches only the Forgejo workflow directory.
+Schema validation does not contact the server or execute workflow steps.
+
 `sh tests/test_workflows.sh` needs Git, POSIX `sh` and Python 3 with its standard library.
 It reads a strict YAML subset: two-space maps, scalar lists, step maps, quoted or simple scalars and literal run blocks.
 It refuses anchors, aliases, flow collections, folded blocks, duplicate keys, extra documents and unknown syntax.
@@ -423,6 +464,8 @@ Event/ref controls cover build inclusion and exclusion within the condition's su
 It checks every run line against explicit shell forms and tracked paths, then checks POSIX shell syntax without execution.
 It rejects copied pins, missing paths, unsafe release mutations and privilege expansion through negative controls.
 The update workflow contract permits only `python3 scripts/update-propose.py` in the publication step.
+Negative controls reject server-specific contexts, server-specific job token names, reversed token precedence and workflow-level `runner.temp`.
+They also require matching temporary paths for detection, publication and artifacts.
 `python3 -m unittest tests.test_update_propose -v` tests the tracked dispatcher separately through injected process and API boundaries.
 Offline fixtures test candidate mapping, explicit refspecs, duplicate lookup, failure issues, attention marking and credential isolation.
 They check safe refusal reasons and exception class names in failure evidence without retaining tokens or response bodies.
@@ -445,5 +488,5 @@ The public tree check separately permits exactly the one public checks workflow.
 - What disk limit, cache cleanup policy and execution budget fit your runners?
 - Which network mirrors and certificate configuration do your runners need? See [image build](image.md).
 - Which approved registry and namespace will receive releases, or where will you keep OCI archives and their hashes?
-- Does your Gitea version enforce update concurrency and the requested runner-token rights?
+- Does your Gitea or Forgejo version enforce update concurrency and the requested runner-token rights?
 - Do the pinned artifact actions and job outputs work with your runner's artifact service?

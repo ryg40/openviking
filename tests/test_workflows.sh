@@ -132,14 +132,14 @@ def parse(text):
     return result
 
 
-DEVELOPMENT_BUILD = "${{ gitea.event_name == 'pull_request' || (gitea.event_name == 'push' && (gitea.ref == 'refs/heads/local-dev' || startsWith(gitea.ref, 'refs/heads/sync/'))) }}"
+DEVELOPMENT_BUILD = "${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/local-dev' || startsWith(github.ref, 'refs/heads/sync/'))) }}"
 
 
 def development_build_result(expression, event, ref):
     """Evaluate only the event/ref condition subset, never runner expressions."""
     require(expression.startswith("${{ ") and expression.endswith(" }}"), "invalid condition wrapper")
     text = expression[4:-3]
-    token_pattern = re.compile(r"\s*(\|\||&&|==|[(),]|'[^']*'|gitea\.(?:event_name|ref)|startsWith)")
+    token_pattern = re.compile(r"\s*(\|\||&&|==|[(),]|'[^']*'|github\.(?:event_name|ref)|startsWith)")
     tokens = []
     position = 0
     while position < len(text):
@@ -148,7 +148,7 @@ def development_build_result(expression, event, ref):
         tokens.append(match[1])
         position = match.end()
     index = 0
-    context = {"gitea.event_name": event, "gitea.ref": ref}
+    context = {"github.event_name": event, "github.ref": ref}
 
     def take():
         nonlocal index
@@ -302,11 +302,10 @@ def validate(path, workflow):
     require(set(workflow) == {"name", "on", "permissions", "defaults", "env", "jobs"}, "workflow keys outside contract")
     require(workflow["permissions"] == {"contents": "read"}, "permissions must be contents: read only")
     require(workflow["defaults"] == {"run": {"shell": "sh"}}, "default shell must be sh")
-    context = "github" if public else "gitea"
     require(workflow["env"] == {
-        "CI_REF": "${{ " + context + ".ref }}", "SCAN_NAME_PREFIX": "openviking-ci-",
-        "CI_RUN": "${{ " + context + ".run_id }}", "CI_ATTEMPT": "${{ " + context + ".run_attempt }}",
-        "SOURCE_URL": "${{ " + context + ".server_url }}/${{ " + context + ".repository }}",
+        "CI_REF": "${{ github.ref }}", "SCAN_NAME_PREFIX": "openviking-ci-",
+        "CI_RUN": "${{ github.run_id }}", "CI_ATTEMPT": "${{ github.run_attempt }}",
+        "SOURCE_URL": "${{ github.server_url }}/${{ github.repository }}",
     }, "environment must use safe runner context")
     expected_events = {"push": {"branches": ["portable"], "tags": ["portable-v*"]},
                        "pull_request": None, "workflow_dispatch": None} if public else {
@@ -341,8 +340,8 @@ def validate(path, workflow):
                     require(number == 0, "checkout must be the initial step")
                     inputs = {"fetch-depth": 0, "persist-credentials": False}
                     if not public:
-                        inputs.update({"github-server-url": "${{ gitea.server_url }}",
-                                       "repository": "${{ gitea.repository }}", "ref": "${{ gitea.sha }}"})
+                        inputs.update({"github-server-url": "${{ github.server_url }}",
+                                       "repository": "${{ github.repository }}", "ref": "${{ github.sha }}"})
                     require(step["with"] == inputs, "checkout must retain full history without credentials")
                     checkout += 1
                 else:
@@ -403,6 +402,7 @@ case "$code" in
 esac
 '''
 UPDATE_PROPOSE = "python3 scripts/update-propose.py\n"
+UPDATE_WORK = "${{ runner.temp }}/openviking-update-${{ github.run_id }}-${{ github.run_attempt }}"
 
 
 def update_command(script):
@@ -420,42 +420,44 @@ def validate_update(workflow):
     require(workflow["concurrency"] == {"group": "openviking-development-update", "cancel-in-progress": False},
             "update runs must serialize without cancellation")
     require(workflow["env"] == {
-        "UPDATE_WORK": "${{ runner.temp }}/openviking-update-${{ gitea.run_id }}-${{ gitea.run_attempt }}",
-        "UPDATE_SERVER": "${{ gitea.server_url }}", "UPDATE_REPOSITORY": "${{ gitea.repository }}"}, "update context is not neutral")
+        "UPDATE_SERVER": "${{ github.server_url }}", "UPDATE_REPOSITORY": "${{ github.repository }}"}, "update context is not neutral")
     require(set(workflow["jobs"]) == {"detect", "qualify"}, "update jobs changed")
     pins = {"checkout": "34e114876b0b11c390a56381ad16ebd13914f8d5",
             "setup-node": "49933ea5288caeca8642d1e84afbd3f7d6820020",
             "upload-artifact": "c6a366c94c3e0affe28c06c8df20a878f24da3cf",
             "download-artifact": "9bc31d5ccc31df68ecc42ccf4149144866c47d8a"}
     checkout = {"fetch-depth": 0, "persist-credentials": False,
-                "github-server-url": "${{ gitea.server_url }}", "repository": "${{ gitea.repository }}", "ref": "${{ gitea.sha }}"}
+                "github-server-url": "${{ github.server_url }}", "repository": "${{ github.repository }}", "ref": "${{ github.sha }}"}
     for name, job in workflow["jobs"].items():
         keys = {"if", "runs-on", "timeout-minutes", "steps"} | ({"outputs"} if name == "detect" else {"needs", "permissions"})
         require(set(job) == keys, "update job keys changed")
         require(job["runs-on"] == "kit-amd64" and job["timeout-minutes"] == (15 if name == "detect" else 90), "update runner or timeout changed")
         if name == "detect":
-            require(job["if"] == "${{ gitea.ref == 'refs/heads/local-dev' }}" and
+            require(job["if"] == "${{ github.ref == 'refs/heads/local-dev' }}" and
                     job["outputs"] == {"proposed": "${{ steps.detect.outputs.proposed }}"}, "detection ref or outputs changed")
             actions = [(0, "checkout", checkout), (2, "upload-artifact", {
-                "name": "update-detection", "path": "${{ env.UPDATE_WORK }}/detect.json",
+                "name": "update-detection", "path": UPDATE_WORK + "/detect.json",
                 "if-no-files-found": "error", "retention-days": 7})]
             require(len(job["steps"]) == 3, "detection steps changed")
             step = job["steps"][1]
-            require(set(step) == {"name", "id", "run"} and step["id"] == "detect" and
+            require(set(step) == {"name", "id", "env", "run"} and step["id"] == "detect" and
+                    step["env"] == {"UPDATE_WORK": UPDATE_WORK} and
                     step["run"] == UPDATE_DETECT, "detection command or exit handling changed")
             path_exists("scripts/upstream-update.py")
             require(subprocess.run(["sh", "-n"], input=step["run"], text=True, capture_output=True).returncode == 0, "invalid detect shell")
         else:
-            require(job["if"] == "${{ needs.detect.outputs.proposed == 'true' && gitea.ref == 'refs/heads/local-dev' }}" and
+            require(job["if"] == "${{ needs.detect.outputs.proposed == 'true' && github.ref == 'refs/heads/local-dev' }}" and
                     job["needs"] == "detect", "qualification gate changed")
             require(job["permissions"] == {"contents": "write", "pull-requests": "write", "issues": "write"}, "qualification permissions widened")
-            actions = [(0, "checkout", checkout), (1, "download-artifact", {"name": "update-detection", "path": "${{ env.UPDATE_WORK }}"}),
+            actions = [(0, "checkout", checkout), (1, "download-artifact", {"name": "update-detection", "path": UPDATE_WORK}),
                        (2, "setup-node", {"node-version": "24"}), (4, "upload-artifact", {
-                           "name": "update-evidence", "path": "${{ env.UPDATE_WORK }}", "if-no-files-found": "error", "retention-days": 7})]
+                           "name": "update-evidence", "path": UPDATE_WORK, "if-no-files-found": "error", "retention-days": 7})]
             require(len(job["steps"]) == 5, "qualification steps changed")
             step = job["steps"][3]
             require(set(step) == {"name", "env", "run"} and
-                    step["env"] == {"UPDATE_TOKEN": "${{ secrets.UPDATE_TOKEN || secrets.GITEA_TOKEN }}"}, "publication token contract changed")
+                    step["env"] == {"UPDATE_WORK": UPDATE_WORK,
+                                    "UPDATE_AUTO_MERGE": "true",
+                                    "UPDATE_TOKEN": "${{ secrets.UPDATE_TOKEN || secrets.GITHUB_TOKEN }}"}, "publication environment changed")
             update_command(step["run"])
         for number, action, inputs in actions:
             step = job["steps"][number]
@@ -528,9 +530,12 @@ for name, callback in [
         "refs/heads/sync/", "refs/heads/topic/")})),
     ("local-dev builds removed", lambda w: w["jobs"]["build"].update({"if": DEVELOPMENT_BUILD.replace(
         "refs/heads/local-dev", "refs/heads/topic/change")})),
-    ("pull-request builds removed", lambda w: w["jobs"]["build"].update({"if": "${{ gitea.event_name == 'push' }}"})),
-    ("sync builds removed", lambda w: w["jobs"]["build"].update({"if": "${{ gitea.ref == 'refs/heads/local-dev' }}"})),
+    ("pull-request builds removed", lambda w: w["jobs"]["build"].update({"if": "${{ github.event_name == 'push' }}"})),
+    ("sync builds removed", lambda w: w["jobs"]["build"].update({"if": "${{ github.ref == 'refs/heads/local-dev' }}"})),
     ("development path filter", lambda w: w["on"]["push"].update(paths=["Dockerfile"])),
+    ("server-specific development context", lambda w: w["env"].update(CI_REF="${{ gitea.ref }}")),
+    ("server-specific checkout context", lambda w: w["jobs"]["fast"]["steps"][0]["with"].update(
+        {"github-server-url": "${{ gitea.server_url }}"})),
 ]:
     check("control: " + name, lambda c=callback: changed(c, development_path), bad=True)
 
@@ -593,7 +598,7 @@ controls = [
 for name, callback in controls:
     check("control: " + name, lambda c=callback: changed(c), bad=True)
 for name, expression in [
-    ("condition with unknown function", "${{ unknown(gitea.ref) }}"),
+    ("condition with unknown function", "${{ unknown(github.ref) }}"),
     ("condition with missing parenthesis", DEVELOPMENT_BUILD.replace("))) }}", ")) }}")),
     ("condition with extra operand", DEVELOPMENT_BUILD.replace(" }}", " 'extra' }}")),
 ]:
@@ -620,6 +625,18 @@ for name, callback in [
     ("update action without hash", lambda w: w["jobs"]["detect"]["steps"][0].update(uses="https://github.com/actions/checkout@v4")),
     ("update permissions widened", lambda w: w["jobs"]["qualify"]["permissions"].update(packages="write")),
     ("update provider secret", lambda w: w["jobs"]["qualify"]["steps"][3]["env"].update(PROVIDER_KEY="${{ secrets.PROVIDER_KEY }}")),
+    ("server-specific update context", lambda w: w["env"].update(UPDATE_SERVER="${{ gitea.server_url }}")),
+    ("server-specific job token", lambda w: w["jobs"]["qualify"]["steps"][3]["env"].update(
+        UPDATE_TOKEN="${{ secrets.UPDATE_TOKEN || secrets.GITEA_TOKEN }}")),
+    ("job token overrides named secret", lambda w: w["jobs"]["qualify"]["steps"][3]["env"].update(
+        UPDATE_TOKEN="${{ secrets.GITHUB_TOKEN || secrets.UPDATE_TOKEN }}")),
+    ("runner context at workflow scope", lambda w: w["env"].update(UPDATE_WORK=UPDATE_WORK)),
+    ("automatic integration disabled", lambda w: w["jobs"]["qualify"]["steps"][3]["env"].pop("UPDATE_AUTO_MERGE")),
+    ("invalid automatic integration", lambda w: w["jobs"]["qualify"]["steps"][3]["env"].update(UPDATE_AUTO_MERGE="yes")),
+    ("missing detection work directory", lambda w: w["jobs"]["detect"]["steps"][1].pop("env")),
+    ("missing publication work directory", lambda w: w["jobs"]["qualify"]["steps"][3]["env"].pop("UPDATE_WORK")),
+    ("artifact work directory mismatch", lambda w: w["jobs"]["qualify"]["steps"][1]["with"].update(
+        path=UPDATE_WORK + "-other")),
     ("update force push", lambda w: w["jobs"]["qualify"]["steps"][3].update(run=update_script + 'git push --force\n')),
     ("update portable push", lambda w: w["jobs"]["qualify"]["steps"][3].update(run=update_script + 'git push origin HEAD:refs/heads/portable\n')),
     ("update local-dev push", lambda w: w["jobs"]["qualify"]["steps"][3].update(run=update_script + 'git push origin HEAD:refs/heads/local-dev\n')),
@@ -629,7 +646,7 @@ for name, callback in [
     ("update no serialization", lambda w: w.pop("concurrency")),
     ("update cancels cleanup", lambda w: w["concurrency"].update({"cancel-in-progress": True})),
     ("update artifact not always", lambda w: w["jobs"]["qualify"]["steps"][-1].pop("if")),
-    ("update wrong source branch", lambda w: w["jobs"]["detect"].update({"if": "${{ gitea.ref == 'refs/heads/portable' }}"})),
+    ("update wrong source branch", lambda w: w["jobs"]["detect"].update({"if": "${{ github.ref == 'refs/heads/portable' }}"})),
     ("public upstream test added", lambda w: w["jobs"]["fast"]["steps"][-1].update(
         run=w["jobs"]["fast"]["steps"][-1]["run"] + "python3 -m unittest tests.test_upstream_update\n")),
 ]:

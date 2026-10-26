@@ -8,10 +8,10 @@ ARG RUST_IMAGE=rust:1.91.1-trixie
 ARG RUST_DIGEST=sha256:867f1d1162913c401378a8504fb17fe2032c760dc316448766f150a130204aad
 # node:24-trixie-slim
 ARG NODE_IMAGE=node:24-trixie-slim
-ARG NODE_DIGEST=sha256:173f125896c3b47ddf056734c7ea789d04595a6a08769a8f78e0df642781fb66
+ARG NODE_DIGEST=sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea
 # python:3.13-slim-trixie (Python build stage and runtime)
 ARG PYTHON_IMAGE=python:3.13-slim-trixie
-ARG PYTHON_DIGEST=sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
+ARG PYTHON_DIGEST=sha256:d98cc29d3266e535dd9da1099688d9cb3ca4753813571e071763d17725460962
 
 # Stage 1: provide Rust toolchain (required by setup.py -> build_ov_cli_artifact -> cargo build)
 # ragfs-python's default S3-enabled dependency set currently requires rustc >= 1.91.1.
@@ -36,7 +36,7 @@ ARG PIP_INDEX_URL
 ARG UV_DEFAULT_INDEX
 
 # uv from PyPI, pinned by hash, in place of the ghcr.io/astral-sh/uv image.
-RUN printf '%s\n' 'uv==0.13.0 --hash=sha256:5163a516b9a488bccb4001f727720b775719dfb6dcb144a9bc0ef23e5cfdd269 --hash=sha256:52c7da0fd9056d9551124777ec77de53f0df7017daf8f98a19e947b7837416ed --hash=sha256:5cb956988442f5b1ca281344818a6b9fa296a799d7024cc53ae571d464150ca2 --hash=sha256:f840e640fe16591f6d71a94e8863707b7ba43c5786d1fe662868a9fb44c53e50' > /tmp/uv-requirements.txt \
+RUN printf '%s\n' 'uv==0.13.5 --hash=sha256:2386c2dc9b59fc1d39b1c500e4319d71d3268232eb3b38e29cd6775d6269e8d4 --hash=sha256:91e58e304b63b6c91bac5561459ab0c3ea24f17bc01ea9359d69fed72142978f --hash=sha256:d162669e3a7811c584b03690eaa11e796ad1d309aa8229d5dfe3cbcd68a90400 --hash=sha256:fa8d26e08e34c29c0c4e820cf3181757086d547240b4f4d31ff1d8bd810ca946' > /tmp/uv-requirements.txt \
  && python -m pip install --no-cache-dir --root-user-action=ignore --only-binary=:all: --require-hashes -r /tmp/uv-requirements.txt \
  && rm /tmp/uv-requirements.txt
 

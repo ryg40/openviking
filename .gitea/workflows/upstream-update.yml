@@ -12,12 +12,11 @@ concurrency:
   group: 'openviking-development-update'
   cancel-in-progress: false
 env:
-  UPDATE_WORK: '${{ runner.temp }}/openviking-update-${{ gitea.run_id }}-${{ gitea.run_attempt }}'
-  UPDATE_SERVER: '${{ gitea.server_url }}'
-  UPDATE_REPOSITORY: '${{ gitea.repository }}'
+  UPDATE_SERVER: '${{ github.server_url }}'
+  UPDATE_REPOSITORY: '${{ github.repository }}'
 jobs:
   detect:
-    if: "${{ gitea.ref == 'refs/heads/local-dev' }}"
+    if: "${{ github.ref == 'refs/heads/local-dev' }}"
     runs-on: kit-amd64
     timeout-minutes: 15
     outputs:
@@ -28,11 +27,13 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          github-server-url: '${{ gitea.server_url }}'
-          repository: '${{ gitea.repository }}'
-          ref: '${{ gitea.sha }}'
+          github-server-url: '${{ github.server_url }}'
+          repository: '${{ github.repository }}'
+          ref: '${{ github.sha }}'
       - name: 'Detect public candidates'
         id: detect
+        env:
+          UPDATE_WORK: '${{ runner.temp }}/openviking-update-${{ github.run_id }}-${{ github.run_attempt }}'
         run: |
           set -eu
           mkdir -p "$UPDATE_WORK"
@@ -48,12 +49,12 @@ jobs:
         uses: https://github.com/actions/upload-artifact@c6a366c94c3e0affe28c06c8df20a878f24da3cf # v3.2.2
         with:
           name: 'update-detection'
-          path: '${{ env.UPDATE_WORK }}/detect.json'
+          path: '${{ runner.temp }}/openviking-update-${{ github.run_id }}-${{ github.run_attempt }}/detect.json'
           if-no-files-found: error
           retention-days: 7
   qualify:
     needs: detect
-    if: "${{ needs.detect.outputs.proposed == 'true' && gitea.ref == 'refs/heads/local-dev' }}"
+    if: "${{ needs.detect.outputs.proposed == 'true' && github.ref == 'refs/heads/local-dev' }}"
     permissions:
       contents: write
       pull-requests: write
@@ -66,21 +67,23 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          github-server-url: '${{ gitea.server_url }}'
-          repository: '${{ gitea.repository }}'
-          ref: '${{ gitea.sha }}'
+          github-server-url: '${{ github.server_url }}'
+          repository: '${{ github.repository }}'
+          ref: '${{ github.sha }}'
       - name: 'Read detection evidence'
         uses: https://github.com/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: 'update-detection'
-          path: '${{ env.UPDATE_WORK }}'
+          path: '${{ runner.temp }}/openviking-update-${{ github.run_id }}-${{ github.run_attempt }}'
       - name: 'Node for qualification tests'
         uses: https://github.com/actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
-      - name: 'Qualify, read notes and propose one candidate'
+      - name: 'Qualify, read notes and integrate one candidate'
         env:
-          UPDATE_TOKEN: '${{ secrets.UPDATE_TOKEN || secrets.GITEA_TOKEN }}'
+          UPDATE_WORK: '${{ runner.temp }}/openviking-update-${{ github.run_id }}-${{ github.run_attempt }}'
+          UPDATE_AUTO_MERGE: 'true'
+          UPDATE_TOKEN: '${{ secrets.UPDATE_TOKEN || secrets.GITHUB_TOKEN }}'
         run: |
           python3 scripts/update-propose.py
       - name: 'Qualification evidence'
@@ -88,6 +91,6 @@ jobs:
         uses: https://github.com/actions/upload-artifact@c6a366c94c3e0affe28c06c8df20a878f24da3cf # v3.2.2
         with:
           name: 'update-evidence'
-          path: '${{ env.UPDATE_WORK }}'
+          path: '${{ runner.temp }}/openviking-update-${{ github.run_id }}-${{ github.run_attempt }}'
           if-no-files-found: error
           retention-days: 7

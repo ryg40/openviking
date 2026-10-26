@@ -514,7 +514,7 @@ def _qualify(repo, args, runner_factory=Runner, fetch=fetch_json):
         )
         if public_code != 0:
             return finish_qualify(result, run, args, clone, branch_out)
-        for test in ("setup_remotes", "promotion", "build_version", "scan", "public_check"):
+        for test in ("setup_remotes", "promotion", "build_version", "scan", "public_check", "workflows"):
             # This suite installs hooks in its own isolated repositories.
             # A command-level hooksPath override would prevent that test setup.
             test_env = {"GIT_CONFIG_COUNT": "0"} if test == "scan" else None
@@ -523,6 +523,10 @@ def _qualify(repo, args, runner_factory=Runner, fetch=fetch_json):
                      skip=REASON if test == "scan" and scanner_code != 0 else None)
         run.step(
             "test-upstream-update", ["python3", "-m", "unittest", "tests.test_upstream_update"],
+            clone,
+        )
+        run.step(
+            "test-update-propose", ["python3", "-m", "unittest", "tests.test_update_propose"],
             clone,
         )
         run.step("build-test", ["sh", "scripts/build.sh", "test"], clone,

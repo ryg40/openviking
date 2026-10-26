@@ -42,11 +42,12 @@ class Fixture:
             "attention": False,
             "manual_steps": [],
             "conflicts": [],
-            "steps": [{"name": "merge", "exit_code": 0}],
+            "steps": [{"name": "merge", "exit_code": 0, "status": "passed"}],
         }
         self.notes = {
             "status": "passed",
             "attention": False,
+            "breaking_section": False,
             "releases": [{"tag": "v99.2.3", "body": "Release body"}],
         }
         self.qualify_code = self.notes_code = 0
@@ -57,6 +58,11 @@ class Fixture:
         self.codes = {}
         self.local_exists = False
         self.local_commit = "a" * 40
+        self.remote_commit = "a" * 40
+        self.qualified_commit = "b" * 40
+        self.merge_commit = "c" * 40
+        self.integration_push_code = 0
+        self.move_after_push = False
         self.environment = {
             "UPDATE_WORK": str(work),
             "UPDATE_SERVER": SERVER,
@@ -78,6 +84,9 @@ class Fixture:
         if argv[:2] == ["git", "rev-parse"]:
             code = 1 if "--verify" in argv and not self.local_exists else 0
             commit = "a" * 40 if argv[-1] == "HEAD" else self.local_commit
+            if argv[-1] == "refs/heads/" + self.item["branch"]:
+                commit = self.qualified_commit
+                code = 0
             stdout = (commit + "\n").encode()
         elif argv[:2] == ["git", "branch"]:
             self.local_exists = True
@@ -85,9 +94,17 @@ class Fixture:
             stdout, code = json.dumps(self.qualification).encode(), self.qualify_code
         elif argv[:3] == ["python3", "scripts/upstream-update.py", "notes"]:
             stdout, code = json.dumps(self.notes).encode(), self.notes_code
+        elif argv[:2] == ["git", "commit-tree"]:
+            stdout = (self.merge_commit + "\n").encode()
         elif argv[:2] == ["git", "push"]:
             stdout = stderr = SECRET_MESSAGE.encode()
-        elif argv[:2] not in (["git", "cat-file"], ["git", "bundle"], ["git", "fetch"]):
+            if argv[-1].endswith(":refs/heads/local-dev"):
+                code = self.integration_push_code
+                if code == 0:
+                    self.remote_commit = "d" * 40 if self.move_after_push else self.merge_commit
+        elif argv[:2] not in (
+            ["git", "cat-file"], ["git", "bundle"], ["git", "fetch"], ["git", "merge-base"]
+        ):
             raise AssertionError(argv)
         code = self.codes.get(tuple(argv[:2]), code)
         return subprocess.CompletedProcess(argv, code, stdout, stderr)
@@ -96,6 +113,8 @@ class Fixture:
         self.api_calls.append((method, path, body))
         if method == "POST":
             return {}
+        if path == "/branches/local-dev":
+            return {"commit": {"id": self.remote_commit}}
         if path.startswith("/branches/"):
             return {} if path.split("/branches/", 1)[1] in self.branches else None
         endpoint = path.split("?", 1)[0]
@@ -224,6 +243,100 @@ class DispatcherTests(unittest.TestCase):
         self.assertEqual((body["head"], body["base"]), ("sync/v99.2.3", "local-dev"))
         self.assertIn("Release body", body["body"])
         self.assertIn("update-evidence", body["body"])
+
+    def test_automatic_upstream_merge_pins_tree_parents_and_push(self):
+        fixture = self.fixture
+        fixture.environment["UPDATE_AUTO_MERGE"] = "true"
+        self.assertEqual(fixture.dispatcher.main(), 0)
+        self.assertEqual(fixture.outcome()["status"], "merged")
+        self.assertEqual(fixture.commands(["git", "commit-tree"]), [[
+            "git", "commit-tree", "b" * 40 + "^{tree}", "-p", "a" * 40, "-p", "b" * 40,
+            "-m", "Merge upstream v99.2.3 into local-dev",
+        ]])
+        self.assertEqual(fixture.commands(["git", "merge-base"]), [[
+            "git", "merge-base", "--is-ancestor", "a" * 40, "b" * 40,
+        ]])
+        self.assertEqual(fixture.commands(["git", "push"]), [[
+            "git", "push", SERVER + "/owner/repo.git", "c" * 40 + ":refs/heads/local-dev",
+        ]])
+        self.assertFalse(fixture.posts())
+        self.assertEqual(fixture.remote_commit, "c" * 40)
+        argv, env = next(call for call in fixture.process_calls if call[0][:2] == ["git", "push"])
+        self.assertNotIn(TOKEN, " ".join(argv))
+        self.assertEqual(env["GIT_COMMITTER_EMAIL"], "update@example.invalid")
+        self.assertEqual((self.work / "merge-push.log").read_text(), "authenticated Git command exit 0\n")
+
+    def test_automatic_merge_keeps_attention_and_pin_candidates_as_proposals(self):
+        for qualification, notes in [
+            ({"attention": True}, {}),
+            ({"attention": None}, {}),
+            ({"steps": []}, {}),
+            ({"manual_steps": None}, {}),
+            ({"manual_steps": ["review"]}, {}),
+            ({"conflicts": ["Dockerfile"]}, {}),
+            ({"steps": [{"status": "failed", "exit_code": 1}]}, {}),
+            ({}, {"attention": True}),
+            ({}, {"attention": None}),
+            ({}, {"breaking_section": True}),
+            ({}, {"breaking_section": None}),
+        ]:
+            with self.subTest(qualification=qualification, notes=notes):
+                fixture = Fixture(self.work)
+                fixture.environment["UPDATE_AUTO_MERGE"] = "true"
+                fixture.qualification.update(qualification)
+                fixture.notes.update(notes)
+                self.assertEqual(fixture.dispatcher.main(), 0)
+                self.assertEqual(fixture.outcome()["status"], "pull_request")
+                self.assertFalse(fixture.commands(["git", "commit-tree"]))
+        fixture = Fixture(self.work, rows=[record("uv", "uv", "99.2.3", "99.2.2")])
+        fixture.environment["UPDATE_AUTO_MERGE"] = "true"
+        fixture.qualification["branch"] = "topic/pin-uv"
+        self.assertEqual(fixture.dispatcher.main(), 0)
+        self.assertEqual(fixture.outcome()["status"], "pull_request")
+        self.assertFalse(fixture.commands(["git", "commit-tree"]))
+
+    def test_automatic_merge_refuses_stale_or_unrelated_sources(self):
+        self.fixture.environment["UPDATE_AUTO_MERGE"] = "true"
+        self.fixture.remote_commit = "d" * 40
+        self.assert_error("development branch changed; qualify again")
+        self.assertFalse(self.fixture.commands(["git", "commit-tree"]))
+        self.assertFalse(self.fixture.commands(["git", "push"]))
+        self.fixture.remote_commit = "a" * 40
+        self.fixture.qualification["prerequisite_commit"] = "e" * 40
+        self.assert_error("qualification source does not match checkout")
+        self.assertFalse(self.fixture.commands(["git", "push"]))
+        self.fixture.qualification["prerequisite_commit"] = "a" * 40
+        self.fixture.codes[("git", "merge-base")] = 1
+        self.assert_error("qualified commit does not contain source")
+        self.assertFalse(self.fixture.commands(["git", "push"]))
+
+    def test_automatic_merge_push_failure_and_uncertain_response_never_retry(self):
+        self.fixture.environment["UPDATE_AUTO_MERGE"] = "true"
+        self.fixture.integration_push_code = 1
+        self.assert_error("integration push failed; inspect remote before retry")
+        self.assertEqual(len(self.fixture.commands(["git", "push"])), 1)
+        self.assertNotIn(TOKEN, (self.work / "merge-push.log").read_text())
+        fixture = Fixture(self.work)
+        fixture.environment["UPDATE_AUTO_MERGE"] = "true"
+        fixture.move_after_push = True
+        self.assertEqual(fixture.dispatcher.main(), 1)
+        self.assertEqual(fixture.outcome()["error"], "integration result is uncertain; inspect remote")
+        self.assertEqual(len(fixture.commands(["git", "push"])), 1)
+        self.assertFalse(fixture.posts())
+
+    def test_invalid_automatic_merge_setting_refuses_publication(self):
+        self.fixture.environment["UPDATE_AUTO_MERGE"] = "yes"
+        self.assert_error("invalid automatic merge setting")
+        self.assertFalse(self.fixture.commands(["git", "push"]))
+
+    def test_failed_qualification_never_automatically_merges(self):
+        self.fixture.environment["UPDATE_AUTO_MERGE"] = "true"
+        self.fixture.qualify_code = 1
+        self.fixture.qualification["status"] = "failed"
+        self.assertEqual(self.fixture.dispatcher.main(), 1)
+        self.assertEqual(self.fixture.outcome()["status"], "issue")
+        self.assertFalse(self.fixture.commands(["git", "push"]))
+        self.assertFalse(self.fixture.commands(["git", "commit-tree"]))
 
     def test_failure_issue_never_pushes(self):
         self.fixture.qualify_code = 1
@@ -468,6 +581,79 @@ class DispatcherTests(unittest.TestCase):
         with contextlib.redirect_stderr(stderr):
             self.assertEqual(fixture.dispatcher.main(), 1)
         self.assertEqual(stderr.getvalue(), "Cannot write dispatch evidence: IsADirectoryError\n")
+
+
+class IntegrationTests(unittest.TestCase):
+    """Real Git proves merge ancestry and the non-forced concurrent-push boundary."""
+
+    def test_merge_tree_and_concurrent_base_update(self):
+        for race in (False, True):
+            with self.subTest(race=race), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                repo, remote, work = root / "repo", root / "remote.git", root / "evidence"
+                repo.mkdir()
+                work.mkdir()
+                env = {
+                    "PATH": os.environ.get("PATH", os.defpath),
+                    "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+                    "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@example.invalid",
+                    "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.invalid",
+                    "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.hooksPath",
+                    "GIT_CONFIG_VALUE_0": os.devnull,
+                }
+
+                def git(*args, cwd=repo):
+                    return subprocess.run(
+                        ["git", *args], cwd=cwd, env=env, check=True,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    ).stdout.decode().strip()
+
+                git("init", "-b", "local-dev")
+                (repo / "value.txt").write_text("base\n")
+                git("add", ".")
+                git("commit", "-m", "base")
+                base = git("rev-parse", "HEAD")
+                git("clone", "--bare", str(repo), str(remote))
+                git("switch", "-c", "sync/v99.2.3")
+                (repo / "value.txt").write_text("qualified\n")
+                git("commit", "-am", "qualified")
+                tip = git("rev-parse", "HEAD")
+                rival = git("commit-tree", base + "^{tree}", "-p", base, "-m", "concurrent")
+                fixture = Fixture(work)
+                fixture.qualification["prerequisite_commit"] = base
+                (work / "source-head.log").write_text(base + "\n")
+                pushes = []
+
+                def process(argv, **kwargs):
+                    if argv[:2] == ["git", "push"]:
+                        pushes.append(argv)
+                        if race:
+                            git("fetch", "--no-tags", str(repo), rival, cwd=remote)
+                            git("update-ref", "refs/heads/local-dev", rival, base, cwd=remote)
+                        argv = [*argv[:2], str(remote), *argv[3:]]
+                    return subprocess.run(argv, cwd=repo, **kwargs)
+
+                def api(method, path, body):
+                    self.assertEqual((method, path), ("GET", "/branches/local-dev"))
+                    return {"commit": {"id": git("rev-parse", "refs/heads/local-dev", cwd=remote)}}
+
+                dispatcher = propose.Dispatcher(fixture.environment, process, api)
+                if race:
+                    with self.assertRaisesRegex(propose.Stop, "integration push failed"):
+                        dispatcher.merge_upstream(fixture.item, fixture.qualification, work)
+                    self.assertEqual(git("rev-parse", "local-dev", cwd=remote), rival)
+                else:
+                    self.assertEqual(
+                        dispatcher.merge_upstream(fixture.item, fixture.qualification, work), "merged"
+                    )
+                    merged = git("rev-parse", "local-dev", cwd=remote)
+                    self.assertEqual(git("show", "-s", "--format=%P", merged, cwd=remote), base + " " + tip)
+                    self.assertEqual(git("rev-parse", merged + "^{tree}", cwd=remote), git("rev-parse", tip + "^{tree}"))
+                    self.assertEqual(git("show", "local-dev:value.txt", cwd=remote), "qualified")
+                self.assertEqual(len(pushes), 1)
+                self.assertNotIn("--force", pushes[0])
+                self.assertEqual(git("rev-parse", "local-dev"), base)
+                self.assertFalse(git("tag", "--list"))
 
 
 class ApiTests(unittest.TestCase):

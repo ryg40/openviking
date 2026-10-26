@@ -234,7 +234,10 @@ class FixtureTests(unittest.TestCase):
                             return 2, "stale map", 0
                 if argv[:3] == ["sh", "scripts/build.sh", "test"] and fail_build:
                     return 1, "synthetic build failure", 0
-                if argv == ["python3", "-m", "unittest", "tests.test_upstream_update"]:
+                if argv in (
+                    ["python3", "-m", "unittest", "tests.test_upstream_update"],
+                    ["python3", "-m", "unittest", "tests.test_update_propose"],
+                ):
                     return 0, "fake update tests passed\n", 0
                 if argv[0] in ("sh", "docker"):
                     return 0, "fake tool passed\n", 0
@@ -285,6 +288,8 @@ class FixtureTests(unittest.TestCase):
         self.assertLess(names.index("public-check-early"), names.index("build-test"))
         self.assertIn("test-public_check", names)
         self.assertIn("test-upstream-update", names)
+        self.assertIn("test-update-propose", names)
+        self.assertIn("test-workflows", names)
         self.assertTrue(result["applied_rules"])
         prerequisite = self.git("rev-parse", "local-dev")
         self.assertEqual(result["prerequisite_commit"], prerequisite)

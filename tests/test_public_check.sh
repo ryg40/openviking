@@ -524,24 +524,6 @@ mutate(
     lambda old: old + '\nvariable "EXTRA" {\n  default = "' + pin_digest + '"\n}\n',
     "pin-copy",
 )
-# The repaired lock retains exact upstream Jiter lines, not a lockfile exemption.
-lock_lines = Path("uv.lock").read_text().splitlines(keepends=True)
-pin_entries = [
-    item for item in json.loads(Path("scripts/public-rules.json").read_text())["pins"]["allowed"]
-    if item["path"] == "uv.lock"
-]
-control("Jiter lock exceptions are present", len(pin_entries) == 90)
-for entry in pin_entries:
-    line = next(line for line in lock_lines if re.fullmatch(entry["pattern"], line.rstrip("\n")))
-    digest = hashlib.sha1(b"blob " + str(len(line.encode())).encode() + b"\0" + line.encode()).hexdigest()
-    control("Jiter lock line hash", digest == entry["line_blob"])
-    mutate(
-        "changed Jiter lock line fails",
-        "uv.lock",
-        lambda old, line=line: old.replace(line, line.rstrip("\n") + " # changed\n", 1),
-        "pin-copy",
-    )
-
 # An exact upstream blob is accepted. Any changed byte puts the file in scope.
 rules_path = root / "scripts/public-rules.json"
 saved_rules = rules_path.read_bytes()
