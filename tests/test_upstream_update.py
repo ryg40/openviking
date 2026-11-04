@@ -56,6 +56,54 @@ def args(**kwargs):
 
 
 class Tests(unittest.TestCase):
+    def test_stable_tag_parts_and_ordering(self):
+        tags = ("v12.34.56", "v12.34.56.1", "v12.34.56.10", "v12.34.57")
+        self.assertEqual(sorted(reversed(tags), key=update.version), list(tags))
+        self.assertEqual(update.version("v12.34.56.789"), (12, 34, 56, 789))
+        self.assertEqual(update.version("v12.34.56"), (12, 34, 56))
+        for tag in ("v0.4.12.dev02", "v12.34.56.1-rc1", "v12.34.56.", "v12.34.56.1.2",
+                    "v0.5", "v12.34.56\n", "v12.34.56.x", "v12.34.56.-1"):
+            with self.subTest(tag=tag), self.assertRaises(update.UpdateError):
+                update.version(tag)
+
+    def test_four_part_detection_for_upstream_scanner_and_uv(self):
+        fake = FakeRegistry()
+        original = fake.run
+        def run(argv, cwd=None, env=None):
+            if argv[:2] == ["git", "ls-remote"]:
+                tags = ["v12.34.56", "v12.34.56.1", "v0.4.12.dev02", "v12.34.56.1-rc1"]
+                return 0, "\n".join("a" * 40 + "\trefs/tags/" + t for t in tags), 0
+            return original(argv, cwd, env)
+        fake.run = run
+        pinned = {**fake.pinned, "upstream": "v12.34.56", "uv": "12.34.56"}
+        with patch.object(update, "pins", return_value=pinned):
+            result, code = update.detect(ROOT, fake, lambda url: {"info": {"version": "12.34.56.1"}})
+        self.assertEqual(code, 10)
+        self.assertFalse(result["errors"])
+        self.assertIn("v0.4.12.dev02", result["prereleases"])
+        records = {r["kind"]: r for r in result["inputs"] if r["kind"] != "base-digest"}
+        self.assertEqual(records["upstream-tag"]["latest"], "v12.34.56.1")
+        self.assertIn(":v12.34.56.1@", records["scanner"]["latest"])
+        self.assertEqual(records["uv"]["latest"], "12.34.56.1")
+        for item in records.values():
+            self.assertTrue(item["proposed"])
+
+    def test_four_part_proposal_targets(self):
+        spec = importlib.util.spec_from_file_location("update_propose", ROOT / "scripts/update-propose.py")
+        propose = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(propose)
+        for kind, latest, target in (
+            ("upstream-tag", "v12.34.56.1", "v12.34.56.1"),
+            ("scanner", "example/scanner:v12.34.56.1@" + HASH, "v12.34.56.1"),
+            ("uv", "12.34.56.1", "12.34.56.1"),
+        ):
+            with self.subTest(kind=kind):
+                item = propose.candidate({"kind": kind, "name": kind, "latest": latest, "pinned": "old"})
+                self.assertEqual(item["to"], target)
+        for tag in ("v0.4.12.dev02", "v12.34.56.1-rc1", "v12.34.56.1.2"):
+            with self.subTest(tag=tag), self.assertRaises(propose.Stop):
+                propose.candidate({"kind": "upstream-tag", "name": "OpenViking", "latest": tag, "pinned": "old"})
+
     def test_detect_nothing_new(self):
         fake = FakeRegistry()
         result, code = update.detect(
@@ -435,6 +483,54 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(result["configuration_keys"]["added"], ["new"])
         self.assertIn("README.md", result["relevant_paths"])
         self.assertEqual(self.state(), before)
+
+    def test_four_part_qualification_and_pin_roundtrip(self):
+        self.git("tag", "v99.1.1.1", "v99.1.1")
+        options = args(workdir=str(self.work))
+        options.to = "v99.1.1.1"
+        with patch.object(update, "docker_wrapper"):
+            result, code = update.qualify(self.repo, options, self.factory())
+        self.assertEqual(code, 0)
+        self.assertEqual(result["branch"], "sync/v99.1.1.1")
+        registry = FakeRegistry()
+        update.patch_pin(self.repo, "scanner", "v99.2.3.4", registry, None)
+        self.assertIn(":v99.2.3.4@", update.pins(self.repo)["scanner"])
+        wheels = [{"filename": f"uv-99.2.3.4-py3-none-{lib}_{arch}.whl",
+                   "digests": {"sha256": str(i) * 64}}
+                  for i, (lib, arch) in enumerate((("manylinux", "x86_64"), ("manylinux", "aarch64"),
+                                                   ("musllinux", "x86_64"), ("musllinux", "aarch64")), 1)]
+        update.patch_pin(self.repo, "uv", "99.2.3.4", registry, lambda url: {"urls": wheels})
+        self.assertEqual(update.pins(self.repo)["uv"], "99.2.3.4")
+
+    def test_four_part_notes_range(self):
+        self.git("tag", "v99.1.1.1", "v99.1.1")
+        self.git("tag", "v99.1.1.2", "v99.1.1")
+        options = argparse.Namespace(from_tag="v99.1.1", to="v99.1.1.2", workdir=str(self.work),
+                                     keep=False, step_timeout=30)
+        tags = ("v99.1.2", "v99.1.1.2", "v99.1.1.1", "v99.1.1", "v99.1.1.dev02", "v99.1.1.2-rc1")
+        releases = [{"tag_name": tag, "body": "Release body"} for tag in tags]
+        releases.append({"tag_name": "v99.1.1.0", "draft": True})
+        result, code = update.notes(self.repo, options, self.factory(), lambda url: releases)
+        self.assertEqual(code, 0)
+        self.assertEqual([r["tag"] for r in result["releases"]], ["v99.1.1.1", "v99.1.1.2"])
+
+    def test_fetch_accepts_four_part_tag(self):
+        wrapper = self.root / "bin"
+        wrapper.mkdir()
+        real_git = shutil.which("git")
+        script = wrapper / "git"
+        script.write_text("#!/bin/sh\nif [ \"$1\" = fetch ]; then exit 0; fi\nexec " + real_git + " \"$@\"\n")
+        script.chmod(0o755)
+        self.git("remote", "add", "origin", "https://example.invalid/repository.git")
+        self.git("remote", "add", "upstream", update.UPSTREAM)
+        self.git("config", "remote.upstream.pushurl", "DISABLED")
+        self.git("config", "remote.upstream.fetch", "+refs/upstream-none/*:refs/upstream/none/*")
+        self.git("config", "remote.upstream.tagOpt", "--no-tags")
+        self.git("update-ref", "refs/upstream/tags/v99.1.1.1", "v99.1.1")
+        code, output, _ = self.runner.run(["sh", str(ROOT / "scripts/fetch-upstream.sh"), "v99.1.1.1"],
+            self.repo, env={"PATH": str(wrapper) + os.pathsep + os.environ["PATH"]})
+        self.assertEqual(code, 0, output)
+        self.assertEqual(output.strip(), self.git("rev-parse", "v99.1.1"))
 
     def test_modify_delete_conflict_is_resolved_only_by_rule(self):
         self.git("switch", "upstream")

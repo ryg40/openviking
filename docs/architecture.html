@@ -1376,7 +1376,7 @@ noscript p { padding: 16px; }
      "group": "services",
      "label": "TaskTracker",
      "sub": "state of async jobs",
-     "summary": "TaskTracker records tasks and queue work with their identity, state and execution events. Storage defaults to files; MySQL is optional. Waiters and /api/v1/tasks read the same store.",
+     "summary": "TaskTracker records tasks and queue work with their identity, state and execution events. Storage defaults to files; optional MySQL tables isolate deployments by service_name and require a schema migration for existing stores. Waiters and /api/v1/tasks read the same store.",
      "files": [
       "openviking/service/task_tracker.py",
       "openviking/service/task_store.py",
@@ -1461,10 +1461,11 @@ noscript p { padding: 16px; }
      "group": "sessions",
      "label": "Session",
      "sub": "two-phase commit",
-     "summary": "A Session records messages and usage. Commit archives messages and queues long-term memory extraction. Working Memory summaries default off; callers must enable them explicitly.",
+     "summary": "A Session records messages and usage. Commit archives messages and queues long-term memory extraction. Working Memory summaries default off; callers must enable them explicitly. Registered secret values remain protected, but automatic discovery of new session secrets is paused in code.",
      "files": [
       "openviking/session/session.py",
-      "openviking/session/archive_store.py"
+      "openviking/session/archive_store.py",
+      "openviking/privacy/session_extractor.py"
      ],
      "keys": [
       "session.memory_policy.working_memory.enabled"

@@ -17,14 +17,17 @@
 #       path). The scan uses these lines only when the base commit is not in
 #       the repository (a shallow clone). No rule of .local/host-values.deny
 #       goes into this file.
-tag	v0.5.2	7f3ae1af822d936c1d0b070537772b0f1d59122f
+tag	v0.5.2.1	f5e6203033a13469c3d9a937f2ca39492ea69c51
 # Upstream demo evidence of the Pi context-management example: a zip of
 # 74 text files (JSON, logs, Markdown, scripts); tree mode reads it: no finding.
 archive	7110648c99e89cf8e35d9ae5a5f50cdc887b23f9	examples/pi-experimental-context-management/demo-evidence/pi-ctxwin-demo.zip
 # Upstream schema definitions and a migration template contain no row data.
-archive	414ec0cd3c16fc86bccab196da76fbeedf28bdb6	openviking/server/account_stores/sql/changes/0000_template.sql
 archive	3fae25d302a51a26a7b932472fbac5111fa3a2fa	openviking/server/account_stores/sql/init.sql
 archive	0bcaf4e098f1c140ce207430e8ff73f3d9e32b1e	openviking/service/sql/task_store_init.sql
+archive	414ec0cd3c16fc86bccab196da76fbeedf28bdb6	openviking/server/account_stores/sql/changes/0000_template.sql
+archive	f67316470a3ac7425a4546780ddbc746a058bc6d	openviking/server/account_stores/sql/changes/0000_template.sql
+archive	8545b993cdc717a278c1decf5e919b28f0dfc73d	openviking/server/account_stores/sql/changes/0001_account_user_list_indexes.sql
+archive	4c4a4091ae7ee2f37c2271582f2ea64ff323a39c	openviking/service/sql/changes/0001_task_store_service_name.sql
 hit	03ff6392fd1a39c81d61709399efaecb22c520ed	tests/misc/test_network_guard.py
 hit	0dbc110853c29a4c799d42f8928b05b1cab8e0ff	tests/misc/test_network_guard.py
 hit	0e0e0723ffb6386b035c6766630f55eb7c46c35d	docs/en/guides/11-grafana-prometheus.md

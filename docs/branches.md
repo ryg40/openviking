@@ -67,7 +67,7 @@ Replace `v<X.Y.Z>` with the new release tag, then run the blocks in order in one
    | --- | --- | --- |
    | `CONTRIBUTING.md` | The kit section at the end stays; the upstream text above it follows upstream | this repo |
    | `Dockerfile` | Base image pins, `REGISTRY_PREFIX`, redirect arguments, uv from PyPI, base labels (six changes) | [image.md](image.md), "Changes against the upstream tag" |
-   | `uv.lock` | Regenerate with the pinned uv to include the upstream `bot` extra's NumPy requirement; keep all resolved package versions | this repo |
+   | `uv.lock` | Keep the pinned uv's lock format revision; upstream now includes the `bot` extra's NumPy requirement | this repo |
    | `.dockerignore` | Allowlist of the `COPY` sources | [image.md](image.md), "Build context" |
    | `.github/dependabot.yml` | Deleted; do not restore during an upstream sync | this repo |
    | `.github/scripts/generate-channels-json.sh` | Deleted; its only caller is the deleted upstream release workflow | [public-check.md](public-check.md), "Rules" |

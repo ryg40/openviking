@@ -3206,7 +3206,7 @@ regexes = [
     '''(?m)^        \(f"curl -uuser:\{BODY\} url", f"user:\{BODY\}"\),$''',
     # tests/server/oauth/test_mcp_www_authenticate.py:73; line hash d4ee8cdf12e28469d7df 77215401ef8fc384a4de
     '''(?m)^        return api_key == "root-test-[1]234567890abcd"$''',
-    # tests/unit/session/test_privacy.py:121; line hash eff3339bab55a3dfe74c fa5a6438b6277617f79b
+    # tests/unit/session/test_privacy.py:171; line hash eff3339bab55a3dfe74c fa5a6438b6277617f79b
     '''(?m)^    key = "sk-proj-[1]2345678901234567890_api_key"$''',
     # examples/memory-plugin-shared/capture-utils.test.mjs:249; line hash dcbcb445e9985d6553e6 313a8adec9de4838990e
     '''(?m)^    tool_input: \{ command: "curl -H 'Authorization: sk_[A]BCDEF'", env: \["KEY=sk_[X]YZ"\], timeout: 30 \},$''',

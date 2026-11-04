@@ -26,6 +26,8 @@ Warning: qualification executes fetched source and build definitions. Use a disp
 | `uv` | The hashed uv requirement in `Dockerfile` | PyPI version and Linux wheel hashes |
 
 Python and npm dependency locks move only with an upstream tag.
+Stable tags use `vMAJOR.MINOR.PATCH` or `vMAJOR.MINOR.PATCH.FOURTH`, with decimal digits in each part.
+Numeric ordering puts a four-part release after its three-part base and before the next patch release.
 Prerelease upstream tags appear in detection results but never become proposed updates.
 Network operations accept injected command and JSON-fetch functions in the unit tests. Tests require no network.
 

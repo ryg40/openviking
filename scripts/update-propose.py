@@ -26,7 +26,7 @@ def require(value, reason):
 def candidate(record):
     kind, name, latest = record["kind"], record["name"], record["latest"]
     if kind == "upstream-tag":
-        require(re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", latest), "invalid upstream tag")
+        require(re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?", latest), "invalid upstream tag")
         target, branch = latest, "sync/" + latest
     elif kind == "base-digest":
         require(
@@ -36,12 +36,12 @@ def candidate(record):
         )
         target, branch = name + "=" + latest, "topic/pin-base-digest"
     elif kind == "scanner":
-        match = re.fullmatch(r"[^@\s]+:(v[0-9]+\.[0-9]+\.[0-9]+)@sha256:[0-9a-f]{64}", latest)
+        match = re.fullmatch(r"[^@\s]+:(v[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)@sha256:[0-9a-f]{64}", latest)
         require(match, "invalid scanner candidate")
         target, branch = match[1], "topic/pin-scanner"
     else:
         require(
-            kind == "uv" and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", latest),
+            kind == "uv" and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?", latest),
             "invalid uv candidate",
         )
         target, branch = latest, "topic/pin-uv"

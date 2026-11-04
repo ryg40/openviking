@@ -1357,8 +1357,16 @@ class StoreMessage(BaseModel):
 
 @_mcp_error_results()
 @mcp.tool(annotations=_DESTRUCTIVE_TOOL_ANNOTATIONS)
-async def remember(messages: list[StoreMessage]) -> str:
-    """Submit information for OpenViking long-term memory extraction. Use when the user says 'remember this', shares preferences, important facts, or decisions worth persisting. Extraction runs in the background and decides which memories to create or update."""
+async def remember(
+    messages: list[StoreMessage],
+    wait: bool = False,
+    timeout: Annotated[float, Field(ge=0, le=300)] = 30.0,
+) -> str:
+    """Submit information for OpenViking long-term memory extraction. Use when the user says 'remember this', shares preferences, important facts, or decisions worth persisting. Extraction runs in the background and decides which memories to create or update.
+
+    Set wait=true to return the final extraction count or a failure status.
+    timeout limits the wait in seconds (0 to 300, default 30). A deadline does not cancel extraction.
+    """
     import uuid
 
     from openviking.message.part import TextPart
@@ -1381,6 +1389,36 @@ async def remember(messages: list[StoreMessage]) -> str:
     if not task_id:
         reason = result.get("reason") or result.get("status") or "unknown"
         return f"Nothing was committed for memory extraction (reason: {reason})."
+    if wait:
+        from openviking.service.task_tracker import TaskStatus, get_task_tracker
+
+        try:
+            task = await get_task_tracker().wait(
+                task_id, account_id=ctx.account_id, user_id=ctx.user.user_id, timeout=timeout
+            )
+        except TimeoutError:
+            return (
+                f"Memory extraction wait timed out (task_id={task_id}). "
+                "The task still runs in the background; the wait did not cancel it."
+            )
+        if task.status != TaskStatus.COMPLETED:
+            return _mcp_failure(
+                f"Memory extraction ended (task_id={task_id}, status={task.status.value}). "
+                f"{task.error or 'No error details are available.'}"
+            )
+        counts = (task.result or {}).get("memories_extracted")
+        if counts is None:
+            return _mcp_failure(
+                f"Memory extraction completed without an extraction count (task_id={task_id})."
+            )
+        count = sum(counts.values())
+        message = (
+            f"Memory extraction completed (task_id={task_id}, status=completed, "
+            f"memories_extracted={count})."
+        )
+        if count == 0:
+            message += " No memory changes were selected by extraction; nothing new was stored."
+        return message
     return (
         f"Submitted {added} message(s) for memory extraction (session {session_id}, "
         f"task_id={task_id}). Extraction runs in the background and decides which memories "
@@ -1398,6 +1436,12 @@ async def write(
     content: str,
     mode: Literal["replace", "append", "create"] = "replace",
     wait: bool = False,
+    timeout: Annotated[
+        Optional[float],
+        Field(
+            deprecated=True, description="Deprecated compatibility parameter; accepted and ignored."
+        ),
+    ] = None,
     acl: Optional[AclSpec] = None,
 ) -> str:
     """Write text to a viking:// file. Use this for files you author yourself (notes, profiles, state), the same way you would use a working directory. To change part of an existing file, prefer the edit tool over a full rewrite. To store a file, document, URL, or repo the user gives you, use add_resource; for a skill, use add_skill. Do not copy its text into a file here instead.
@@ -1435,6 +1479,12 @@ async def edit(
     new_string: str,
     replace_all: bool = False,
     wait: bool = False,
+    timeout: Annotated[
+        Optional[float],
+        Field(
+            deprecated=True, description="Deprecated compatibility parameter; accepted and ignored."
+        ),
+    ] = None,
 ) -> str:
     """Replace an exact string with new text in an existing viking:// file. Use this for targeted changes instead of rewriting the whole file with the write tool. old_string must match the file's current content exactly, including indentation and newlines; use the read tool first to see it. The edit fails and the file is left unchanged if old_string is not found, or if it matches more than once and replace_all is false (pass more surrounding context to make it unique, or set replace_all=true to replace every occurrence). Pass new_string="" to delete old_string.
 

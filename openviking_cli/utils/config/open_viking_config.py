@@ -112,6 +112,27 @@ class ConnectorConfig(BaseModel):
             raise ValueError("connector.poll_interval_ms must be > 0")
         return self
 
+    def credential_resolve_url(self) -> str:
+        """Derive the unified credential-resolve endpoint from ``auth``.
+
+        The Feishu compatibility endpoint (``.../oauth/access_token``) and the
+        unified resolver (``.../credential/resolve``) are two fixed paths on the
+        same KernelAPI inner entry, so the resolver URL is derived from the
+        configured ``auth`` rather than adding a second endpoint setting; this
+        keeps existing Feishu deployments unchanged. Returns an empty string
+        when ``auth`` is unset or uses an unrecognized path.
+        """
+        auth = self.auth.strip()
+        if not auth:
+            return ""
+        compat_suffix = "/oauth/access_token"
+        resolve_suffix = "/credential/resolve"
+        if auth.endswith(compat_suffix):
+            return auth[: -len(compat_suffix)] + resolve_suffix
+        if auth.endswith(resolve_suffix):
+            return auth
+        return ""
+
 
 class ParserApiConfig(BaseModel):
     """Configuration for the Understanding files/responses API."""

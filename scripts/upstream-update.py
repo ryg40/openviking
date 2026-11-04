@@ -19,7 +19,7 @@ UPSTREAM = "https://github.com/volcengine/OpenViking.git"
 RELEASES = "https://api.github.com/repos/volcengine/OpenViking/releases"
 SCANNER = "https://github.com/gitleaks/gitleaks.git"
 UV = "https://pypi.org/pypi/uv/json"
-TAG = re.compile(r"v(\d+)\.(\d+)\.(\d+)\Z")
+TAG = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)(?:\.([0-9]+))?\Z")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 KINDS = ("upstream-tag", "base-digest", "scanner", "uv")
 REASON = "a required earlier step failed"
@@ -32,8 +32,8 @@ class UpdateError(Exception):
 def version(tag):
     match = TAG.fullmatch(tag)
     if not match:
-        raise UpdateError("expected a stable vMAJOR.MINOR.PATCH tag")
-    return tuple(map(int, match.groups()))
+        raise UpdateError("expected a stable vMAJOR.MINOR.PATCH[.FOURTH] tag")
+    return tuple(int(part) for part in match.groups() if part is not None)
 
 
 def clean_env(home=None):
@@ -98,7 +98,7 @@ def pins(repo):
     scanner = re.search(r"^GITLEAKS_IMAGE=\$\{GITLEAKS_IMAGE:-([^}]+)\}",
                         (repo / "scripts/scan.sh").read_text(), re.M)
     frontend = re.search(r"^# syntax=([^@\s]+)@(sha256:[0-9a-f]{64})$", dockerfile, re.M)
-    uv = re.search(r"uv==([0-9]+\.[0-9]+\.[0-9]+)( (?:--hash=sha256:[0-9a-f]{64} ?)+)", dockerfile)
+    uv = re.search(r"uv==([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)( (?:--hash=sha256:[0-9a-f]{64} ?)+)", dockerfile)
     if not all((tag, scanner, frontend, uv)):
         raise UpdateError("cannot read a pinned input from its source")
     version(tag[1])

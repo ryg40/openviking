@@ -97,7 +97,7 @@ The `Dockerfile` has four stages. Only the last stage is in the image.
 | --- | --- | --- |
 | `rust-toolchain` | `RUST_IMAGE` (`rust:1.91.1-trixie`) | The Rust toolchain. The stage `py-builder` copies `/usr/local/cargo` and `/usr/local/rustup` from it. |
 | `web-studio-builder` | `NODE_IMAGE` (`node:24-trixie-slim`) | The Web Studio bundle: `npm ci`, then `npm run build -- --base=/studio/` in `web-studio/`. |
-| `py-builder` | `PYTHON_IMAGE` (`python:3.13-slim-trixie`) | The virtual environment `/app/.venv`. `uv sync --locked` installs the project with the extras `bot`, `gemini`, `opengauss` and `expiry`. The install compiles the Rust CLI and the native extensions. |
+| `py-builder` | `PYTHON_IMAGE` (`python:3.13-slim-trixie`) | The virtual environment `/app/.venv`. `uv sync --locked` installs the project with the extras `bot`, `gemini`, `opengauss`, `expiry`, `mysql` and `redis-mysql`. The install compiles the Rust CLI and the native extensions. |
 | Runtime (the last stage, no name) | `PYTHON_IMAGE` | The Debian packages `ca-certificates`, `curl`, `git`, `libstdc++6` and `libcairo2`, the directory `/app/.venv` and the two files of `deploy/docker/`. |
 
 Each base image is pinned by digest in the `ARG` lines at the top of the `Dockerfile`.
