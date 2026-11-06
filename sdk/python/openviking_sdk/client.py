@@ -58,6 +58,8 @@ from .options import (
     PreflightAssetOptions,
     ReindexOptions,
     ResolveAssetsOptions,
+    RuleCompileOptions,
+    RuleSearchOptions,
     SearchContextOptions,
     SearchContextResult,
     SearchOptions,
@@ -1396,6 +1398,26 @@ class AsyncHTTPClient:
         )
         return self._handle_response_data(response).get("result", {})
 
+    async def ensure_directory_index(
+        self,
+        uri: str,
+        fallback_abstract: str,
+        wait: bool = True,
+    ) -> Dict[str, Any]:
+        """Preserve summaries; fallback_abstract seeds L0 only when both are absent.
+        Return readable levels, or a queued task with wait=False.
+        """
+        response = await self._request(
+            "POST",
+            "/api/v1/content/ensure_directory_index",
+            json={
+                "uri": VikingURI.normalize(uri),
+                "fallback_abstract": fallback_abstract,
+                "wait": wait,
+            },
+        )
+        return self._handle_response_data(response).get("result", {})
+
     async def set_tags(
         self,
         uri: str,
@@ -1680,12 +1702,109 @@ class AsyncHTTPClient:
         skill: str,
         options: Optional[CompileOptions] = None,
     ) -> Dict[str, Any]:
+        """Return a queued task, or saved settings when args explicitly configure scheduling."""
         payload = self._build_options_payload(
             options,
             CompileOptions,
             fixed={"from": list(from_uris), "to": to, "skill": skill},
         )
         response = await self._request("POST", "/api/v1/compile", json=payload)
+        return self._handle_response(response)
+
+    async def rule_compile(
+        self,
+        instruction: Optional[str] = None,
+        options: Optional[RuleCompileOptions] = None,
+    ) -> Dict[str, Any]:
+        """Compile inline instructions and resource-backed files into durable rules."""
+        option_values = dict(options or {})
+        raw_sources: Any = option_values.pop("sources", [])
+        if option_values:
+            names = ", ".join(sorted(option_values))
+            raise ValueError(f"Unsupported rule compile options: {names}")
+        if not isinstance(raw_sources, list):
+            raise ValueError("Rule compile sources must be a list")
+
+        sources: List[Dict[str, Any]] = []
+        for source in raw_sources:
+            if isinstance(source, dict):
+                normalized = dict(source)
+                if normalized.get("resource_uri"):
+                    normalized["resource_uri"] = VikingURI.normalize(
+                        str(normalized["resource_uri"])
+                    )
+                    sources.append(normalized)
+                    continue
+                for target_field in ("to", "parent"):
+                    if normalized.get(target_field):
+                        normalized[target_field] = VikingURI.normalize(
+                            str(normalized[target_field])
+                        )
+                path_value = normalized.get("path")
+                if isinstance(path_value, str):
+                    local_path = Path(path_value).expanduser()
+                    if local_path.exists() and not normalized.get("add_type"):
+                        normalized.pop("path")
+                        normalized.setdefault("source_name", local_path.name)
+                        if local_path.is_dir():
+                            zip_path = self._zip_directory(str(local_path))
+                            try:
+                                normalized["temp_file_id"] = await self._upload_temp_file(zip_path)
+                            finally:
+                                Path(zip_path).unlink(missing_ok=True)
+                        else:
+                            normalized["temp_file_id"] = await self._upload_temp_file(
+                                str(local_path)
+                            )
+                sources.append(normalized)
+                continue
+
+            value = os.fspath(source)
+            if value.startswith("viking://"):
+                sources.append({"resource_uri": VikingURI.normalize(value)})
+                continue
+            path = Path(value).expanduser()
+            if path.is_dir():
+                zip_path = self._zip_directory(str(path))
+                try:
+                    temp_file_id = await self._upload_temp_file(zip_path)
+                finally:
+                    Path(zip_path).unlink(missing_ok=True)
+                sources.append(
+                    {
+                        "temp_file_id": temp_file_id,
+                        "source_name": path.name,
+                    }
+                )
+            elif path.is_file():
+                sources.append(
+                    {
+                        "temp_file_id": await self._upload_temp_file(str(path)),
+                        "source_name": path.name,
+                    }
+                )
+            else:
+                sources.append({"path": value})
+
+        payload = {"instruction": instruction, "sources": sources}
+        response = await self._request(
+            "POST",
+            "/api/v1/rules/compile",
+            json=self._compact_request_body(payload),
+        )
+        return self._handle_response(response)
+
+    async def rule_search(
+        self,
+        task_context: str,
+        options: Optional[RuleSearchOptions] = None,
+    ) -> Dict[str, Any]:
+        payload = self._build_options_payload(
+            options,
+            RuleSearchOptions,
+            fixed={"task_context": task_context},
+        )
+        response = await self._request("POST", "/api/v1/rules/search", json=payload)
         return self._handle_response(response)
 
     async def cancel_task(self, task_id: str) -> Dict[str, Any]:
@@ -2098,11 +2217,6 @@ class AsyncHTTPClient:
         response = await self._http.delete(
             f"/api/v1/admin/accounts/{account_id}/groups/{group_id}/members/{user_id}"
         )
-        return self._handle_response(response)
-
-    async def admin_migrate(self, cleanup: bool = False) -> Dict[str, Any]:
-        action = "cleanup" if cleanup else "migrate"
-        response = await self._request("POST", "/api/v1/admin/migrate", json={"action": action})
         return self._handle_response(response)
 
     async def admin_get_agent_evolution(self) -> Dict[str, Any]:
@@ -2816,6 +2930,17 @@ class SyncHTTPClient:
             )
         )
 
+    def ensure_directory_index(
+        self,
+        uri: str,
+        fallback_abstract: str,
+        wait: bool = True,
+    ) -> Dict[str, Any]:
+        """Index uri; use fallback_abstract only when both summaries are absent."""
+        return run_async(
+            self._async_client.ensure_directory_index(uri, fallback_abstract, wait=wait)
+        )
+
     def set_tags(
         self,
         uri: str,
@@ -2991,6 +3116,20 @@ class SyncHTTPClient:
         options: Optional[CompileOptions] = None,
     ) -> Dict[str, Any]:
         return run_async(self._async_client.compile(from_uris, to, skill, options))
+
+    def rule_compile(
+        self,
+        instruction: Optional[str] = None,
+        options: Optional[RuleCompileOptions] = None,
+    ) -> Dict[str, Any]:
+        return run_async(self._async_client.rule_compile(instruction, options))
+
+    def rule_search(
+        self,
+        task_context: str,
+        options: Optional[RuleSearchOptions] = None,
+    ) -> Dict[str, Any]:
+        return run_async(self._async_client.rule_search(task_context, options))
 
     def cancel_task(self, task_id: str) -> Dict[str, Any]:
         return run_async(self._async_client.cancel_task(task_id))
@@ -3211,9 +3350,6 @@ class SyncHTTPClient:
         return run_async(
             self._async_client.admin_remove_group_member(account_id, group_id, user_id)
         )
-
-    def admin_migrate(self, cleanup: bool = False) -> Dict[str, Any]:
-        return run_async(self._async_client.admin_migrate(cleanup=cleanup))
 
     def admin_get_agent_evolution(self) -> Dict[str, Any]:
         return run_async(self._async_client.admin_get_agent_evolution())

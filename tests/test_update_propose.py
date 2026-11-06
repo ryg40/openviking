@@ -244,6 +244,21 @@ class DispatcherTests(unittest.TestCase):
         self.assertIn("Release body", body["body"])
         self.assertIn("update-evidence", body["body"])
 
+    def test_pin_pull_requests_use_same_repository_branch_names(self):
+        for source, branch in [
+            (record("base-digest", "node", "sha256:" + "b" * 64), "topic/pin-base-digest"),
+            (record("uv", "uv", "99.2.3"), "topic/pin-uv"),
+        ]:
+            with self.subTest(branch=branch):
+                fixture = Fixture(self.work, rows=[source])
+                fixture.qualification["branch"] = branch
+                self.assertEqual(fixture.dispatcher.main(), 0)
+                [(path, body)] = fixture.posts()
+                self.assertEqual(path, "/pulls")
+                self.assertEqual(set(body), {"title", "body", "head", "base"})
+                self.assertEqual((body["head"], body["base"]), (branch, "local-dev"))
+                self.assertNotIn("failed_request", fixture.outcome())
+
     def test_automatic_upstream_merge_pins_tree_parents_and_push(self):
         fixture = self.fixture
         fixture.environment["UPDATE_AUTO_MERGE"] = "true"
@@ -678,8 +693,55 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(self.fixture.dispatcher.main(), 1)
         evidence = self.fixture.outcome()
         self.assertEqual(evidence["error"], "API request failed with HTTP 403")
-        for secret in (TOKEN, "password", SECRET_MESSAGE):
+        self.assertEqual(evidence["failed_request"], {"method": "GET", "path": "/pulls"})
+        for secret in (TOKEN, "password", SECRET_MESSAGE, SERVER):
             self.assertNotIn(secret, json.dumps(evidence))
+
+    def test_publication_404_records_method_and_path_after_successful_lookups(self):
+        for endpoint in ("/pulls", "/issues"):
+            with self.subTest(endpoint=endpoint):
+                fixture = Fixture(self.work)
+                fixture.dispatcher.api = None
+                fixture.qualify_code = 1 if endpoint == "/issues" else 0
+
+                def respond(req, timeout):
+                    path = req.full_url.removeprefix(SERVER + "/api/v1/repos/owner/repo")
+                    if req.method == "POST":
+                        self.assertEqual(path, endpoint)
+                        raise urllib.error.HTTPError(
+                            req.full_url, 404, SECRET_MESSAGE, {},
+                            io.BytesIO(SECRET_MESSAGE.encode()),
+                        )
+                    result = fixture.api(req.method, path)
+                    if result is None:
+                        raise urllib.error.HTTPError(req.full_url, 404, SECRET_MESSAGE, {}, None)
+                    return io.BytesIO(json.dumps(result).encode())
+
+                opener = Mock()
+                opener.open.side_effect = respond
+                with patch.object(propose.urllib.request, "build_opener", return_value=opener):
+                    self.assertEqual(fixture.dispatcher.main(), 1)
+                evidence = fixture.outcome()
+                self.assertEqual(evidence["error"], "API request failed with HTTP 404")
+                self.assertEqual(
+                    evidence["failed_request"], {"method": "POST", "path": endpoint}
+                )
+                self.assertEqual(bool(fixture.commands(["git", "push"])), endpoint == "/pulls")
+                for secret in (TOKEN, "password", SECRET_MESSAGE, SERVER):
+                    self.assertNotIn(secret, json.dumps(evidence))
+
+    def test_failed_request_omits_query_and_untrusted_error_url(self):
+        opener = Mock()
+        opener.open.side_effect = urllib.error.HTTPError(
+            SECRET_MESSAGE, 404, SECRET_MESSAGE, {}, None
+        )
+        path = "/issues?state=open&access_token=" + TOKEN
+        with patch.object(propose.urllib.request, "build_opener", return_value=opener):
+            with self.assertRaises(propose.ApiFailure) as raised:
+                self.fixture.dispatcher.request("GET", path)
+        self.assertEqual(raised.exception.request, {"method": "GET", "path": "/issues"})
+        self.assertNotIn(TOKEN, json.dumps(raised.exception.request))
+        self.assertEqual(str(raised.exception), "API request failed with HTTP 404")
 
     def test_branch_404_only_means_unoccupied(self):
         opener = Mock()
@@ -698,6 +760,20 @@ class ApiTests(unittest.TestCase):
                 with patch.object(propose.urllib.request, "build_opener", return_value=opener):
                     self.assertEqual(self.fixture.dispatcher.main(), 1)
                 self.assertEqual(self.fixture.outcome()["error"], "API request failed")
+                self.assertEqual(
+                    self.fixture.outcome()["failed_request"], {"method": "GET", "path": "/pulls"}
+                )
+                self.assertNotIn(TOKEN, json.dumps(self.fixture.outcome()))
+
+    def test_redirect_refusal_records_request_without_destination(self):
+        opener = Mock()
+        opener.open.side_effect = propose.Stop("API redirect refused")
+        with patch.object(propose.urllib.request, "build_opener", return_value=opener):
+            self.assertEqual(self.fixture.dispatcher.main(), 1)
+        self.assertEqual(self.fixture.outcome()["error"], "API redirect refused")
+        self.assertEqual(
+            self.fixture.outcome()["failed_request"], {"method": "GET", "path": "/pulls"}
+        )
 
     def test_api_disables_proxy_and_redirects(self):
         response = io.BytesIO(b"[]")

@@ -12,3 +12,7 @@ tests/misc/test_docker_workflow_native_multiarch.py
 .github/scripts/check-plugin-version-bumps.sh
 .github/host-compat.json
 Caddyfile
+.github/CI.md
+.github/actionlint.yaml
+.github/actions/
+.github/scripts/dsh-desktop-smoke.mjs

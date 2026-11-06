@@ -67,7 +67,7 @@ Replace `v<X.Y.Z>` with the new release tag, then run the blocks in order in one
    | --- | --- | --- |
    | `CONTRIBUTING.md` | The kit section at the end stays; the upstream text above it follows upstream | this repo |
    | `Dockerfile` | Base image pins, `REGISTRY_PREFIX`, redirect arguments, uv from PyPI, base labels (six changes) | [image.md](image.md), "Changes against the upstream tag" |
-   | `uv.lock` | Keep the pinned uv's lock format revision; upstream now includes the `bot` extra's NumPy requirement | this repo |
+   | `uv.lock` | Regenerate with the Dockerfile-pinned uv; the current lock matches upstream without a local delta | this repo |
    | `.dockerignore` | Allowlist of the `COPY` sources | [image.md](image.md), "Build context" |
    | `.github/dependabot.yml` | Deleted; do not restore during an upstream sync | this repo |
    | `.github/scripts/generate-channels-json.sh` | Deleted; its only caller is the deleted upstream release workflow | [public-check.md](public-check.md), "Rules" |
@@ -88,6 +88,7 @@ Replace `v<X.Y.Z>` with the new release tag, then run the blocks in order in one
    | `examples/pi-coding-agent-extension/package.json`, `examples/pi-coding-agent-extension/package-lock.json` | Pin @modelcontextprotocol/client to exact `2.2.0` for [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (an MCP client security advisory); upstream pins `2.0.0` | this repo |
    | `examples/pi-coding-agent-extension/tests/takeover-session-manager.test.mjs` | Confirm Working Memory in the mock commit response, as the upstream takeover guard requires | [testing.md](testing.md), "Pi extension tests" |
    | `examples/pi-coding-agent-extension/lib/capture-utils-local.mjs` | Local wrapper of shared filters; keep tool-output opt-in, credential redaction and keyword capture | [Pi extension README](../examples/pi-coding-agent-extension/README.md), "Local fork: differences and updating an installed copy" |
+   | `openviking/server/mcp_endpoint.py` | Keep the opt-in bounded `remember` wait, extraction counts and owner-scoped terminal task handling | this repo |
    | `tests/unit/session/test_extraction_batch.py` | Keep the model-error propagation regression; its direct summary call does not depend on the Working Memory default | this repo |
    | `tests/misc/test_abi3_packaging_config.py` | Keep workflow tests skipped when their workflow is absent after each sync | this repo |
    | `tests/misc/test_root_docker_image_packaging.py` | Keep workflow tests skipped when their workflow is absent after each sync | this repo |

@@ -782,8 +782,8 @@ noscript p { padding: 16px; }
      "id": "mcp",
      "group": "container",
      "label": "/mcp endpoint",
-     "sub": "FastMCP, 20 tools",
-     "summary": "The /mcp route is a stateless FastMCP app inside the server. It uses the same identity check as the REST API. Its 20 tools include find, search, read, write, remember and add_resource.",
+     "sub": "FastMCP, 24 tools",
+     "summary": "The /mcp route is a stateless FastMCP app inside the server. It uses the same identity check as the REST API. Its 24 tools include find, search, read, write, remember and add_resource.",
      "files": [
       "openviking/server/mcp_endpoint.py",
       "openviking/server/app.py"
@@ -1249,7 +1249,7 @@ noscript p { padding: 16px; }
      "summary": "An auth plugin resolves X-API-Key or bearer-token identity. The root key manages accounts. Account Store keeps identities and credentials, using file storage by default or optional MySQL-backed providers.",
      "files": [
       "openviking/server/auth/",
-      "openviking/server/api_keys/new.py",
+      "openviking/server/api_keys/key_mgr.py",
       "openviking/server/identity.py",
       "openviking/server/config.py"
      ],

@@ -41,6 +41,7 @@ import {
 } from '#/components/ui/dialog'
 import { useAppConnection } from '#/hooks/use-app-connection'
 import {
+  deleteFs,
   getHealth,
   getOvResult,
   getSystemStatus,
@@ -48,6 +49,9 @@ import {
   postResources,
   postContentWrite,
   postSystemWait,
+  postFsMkdir,
+  postFsMv,
+  ovClient,
 } from '#/lib/ov-client'
 import {
   addMessage,
@@ -85,6 +89,9 @@ import {
   parseAddResource,
   parseAddSkill,
   parseWrite,
+  parseRemove,
+  parseMkdir,
+  parseTransfer,
   submitMemoryCommand,
   taskResultDetails,
   taskResultResourceUri,
@@ -130,6 +137,7 @@ const URI_ARGUMENT_COMMANDS = new Set([
   '/ls',
   '/overview',
   '/read',
+  '/rm',
   '/stat',
   '/tree',
 ])
@@ -326,6 +334,10 @@ const PARAMETER_META: Partial<
   writeContent: { type: 'Text', required: true },
   writeMode: { type: 'Text', defaultValue: 'replace' },
   writeWait: { type: 'Boolean', defaultValue: 'false' },
+  recursive: { type: 'Boolean', defaultValue: 'false' },
+  targetUri: { type: 'URI', required: true },
+  sourceUri: { type: 'URI', required: true },
+  directoryDescription: { type: 'Text' },
 }
 
 function extractVikingUris(text: string): string[] {
@@ -468,7 +480,7 @@ function sessionToRef(session: Pick<SessionListItem, 'session_id' | 'uri'>) {
   return {
     label: session.session_id,
     meta: 'session',
-    uri: session.uri || `viking://session/${session.session_id}`,
+    uri: session.uri || `viking://~/sessions/${session.session_id}`,
   }
 }
 
@@ -673,7 +685,11 @@ export function TerminalPanel({
               description: t('terminal.resourceSuggestion'),
               group: 'resource' as const,
               id: `resource:${activeCommand.command}:${uri}`,
-              insertText: `${activeCommand.command} ${uri}`,
+              insertText: `${activeCommand.command} ${
+                activeCommand.command === '/rm'
+                  ? `"${uri.replace(/["\\]/g, '\\$&')}"`
+                  : uri
+              }`,
               usage: `${activeCommand.command} ${uri}`,
             }))
         : []
@@ -1173,7 +1189,7 @@ export function TerminalPanel({
                   id,
                   formatJson(result),
                 ]),
-                refs: [{ uri: `viking://session/${id}` }],
+                refs: [{ uri: `viking://~/sessions/${id}` }],
               })
             }
             return
@@ -1463,6 +1479,73 @@ export function TerminalPanel({
             })
             return
           }
+          case '/mkdir': {
+            const request = parseMkdir(trimmed)
+            await getOvResult<unknown>(postFsMkdir({ body: request }))
+            if (identityRef.current !== identityScopeKey) return
+            append({
+              kind: 'success',
+              title: `/mkdir ${request.uri}`,
+              body: t('terminal.mkdirCreated', { uri: request.uri }),
+              refs: [{ uri: request.uri }],
+            })
+            await invalidateAll()
+            return
+          }
+          case '/mv':
+          case '/cp': {
+            const action = name === '/mv' ? 'mv' : 'cp'
+            const request = parseTransfer(trimmed, action)
+            await getOvResult<unknown>(
+              action === 'mv'
+                ? postFsMv({ body: request })
+                : ovClient.client.post({
+                    url: '/api/v1/fs/cp',
+                    body: request,
+                    headers: { 'Content-Type': 'application/json' },
+                  }),
+            )
+            if (identityRef.current !== identityScopeKey) return
+            append({
+              kind: 'success',
+              title: `${name} ${request.from_uri} ${request.to_uri}`,
+              body: t(
+                action === 'mv'
+                  ? 'terminal.mvCompleted'
+                  : 'terminal.cpCompleted',
+                { from: request.from_uri, to: request.to_uri },
+              ),
+              refs: [{ uri: request.to_uri }],
+            })
+            await invalidateAll()
+            return
+          }
+          case '/rm': {
+            const request = parseRemove(trimmed)
+            if (
+              !window.confirm(
+                t(
+                  request.recursive
+                    ? 'terminal.rmConfirmRecursive'
+                    : 'terminal.rmConfirm',
+                  { uri: request.uri },
+                ),
+              )
+            ) {
+              append({ kind: 'info', title: t('terminal.rmCancelled') })
+              return
+            }
+            if (identityRef.current !== identityScopeKey) return
+            await getOvResult<unknown>(deleteFs({ query: request }))
+            if (identityRef.current !== identityScopeKey) return
+            append({
+              kind: 'success',
+              title: `/rm ${request.uri}`,
+              body: t('terminal.rmDeleted', { uri: request.uri }),
+            })
+            await invalidateAll()
+            return
+          }
           case '/write': {
             const request = parseWrite(trimmed)
             const result = await getOvResult<unknown>(
@@ -1531,7 +1614,7 @@ export function TerminalPanel({
             const sessionRef = (id: string): ResourceRef => ({
               label: id,
               meta: 'session',
-              uri: `viking://session/${id}`,
+              uri: `viking://~/sessions/${id}`,
             })
 
             switch (subcommand) {
@@ -1642,7 +1725,7 @@ export function TerminalPanel({
                     {
                       label: archiveId,
                       meta: 'archive',
-                      uri: `viking://session/${id}/history/${archiveId}`,
+                      uri: `viking://~/sessions/${id}/history/${archiveId}`,
                     },
                   ],
                   title: `/session archive ${id} ${archiveId}`,
@@ -1732,7 +1815,7 @@ export function TerminalPanel({
                     {
                       label: toolResultId,
                       meta: 'tool result',
-                      uri: `viking://session/${id}/tool-results/${toolResultId}`,
+                      uri: `viking://~/sessions/${id}/tool-results/${toolResultId}`,
                     },
                   ],
                   title: `/session tool-result ${id} ${toolResultId}`,
@@ -1765,7 +1848,7 @@ export function TerminalPanel({
                     {
                       label: toolResultId,
                       meta: 'tool search',
-                      uri: `viking://session/${id}/tool-results/${toolResultId}`,
+                      uri: `viking://~/sessions/${id}/tool-results/${toolResultId}`,
                     },
                   ],
                   title: `/session tool-search ${id} ${toolResultId}`,

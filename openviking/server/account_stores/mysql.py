@@ -57,6 +57,7 @@ from openviking_cli.exceptions import (
     InvalidArgumentError,
     NotFoundError,
     PermissionDeniedError,
+    UnauthenticatedError,
 )
 from openviking_cli.session.user_id import (
     validate_account_id,
@@ -1075,7 +1076,10 @@ class MySQLAccountStore(AccountStore):
             ).all()
         return tuple(group_id for group_id in group_ids if group_id is not None)
 
-    async def add_group_member(self, account_id: str, group_id: str, user_id: str) -> bool:
+    async def add_group_members(
+        self, account_id: str, group_id: str, user_ids: list[str]
+    ) -> bool:
+        user_ids = list(dict.fromkeys(user_ids))
         async with self._transaction() as session:
             account = await self._lock_account(session, account_id)
             self._require_active(account)
@@ -1090,27 +1094,49 @@ class MySQLAccountStore(AccountStore):
             )
             if group is None:
                 raise NotFoundError(group_id, "group")
-            user = await self._lock_user(session, account, user_id)
-            self._require_active(user)
-            if (
-                await session.scalar(
-                    select(GroupMember.group_pk).where(
-                        GroupMember.service_name == self._service_name,
-                        GroupMember.account_pk == account.account_pk,
-                        GroupMember.group_pk == group.group_pk,
-                        GroupMember.user_pk == user.user_pk,
+            users = {
+                user.user_id: user
+                for user in (
+                    await session.scalars(
+                        select(User)
+                        .where(
+                            User.service_name == self._service_name,
+                            User.account_pk == account.account_pk,
+                            User.user_id.in_(user_ids),
+                        )
+                        .with_for_update()
                     )
-                )
-                is None
-            ):
-                session.add(
+                ).all()
+            }
+            for user_id in user_ids:
+                user = users.get(user_id)
+                if user is None:
+                    raise NotFoundError(user_id, "user")
+                self._require_active(user)
+            existing = set(
+                (
+                    await session.scalars(
+                        select(GroupMember.user_pk).where(
+                            GroupMember.service_name == self._service_name,
+                            GroupMember.account_pk == account.account_pk,
+                            GroupMember.group_pk == group.group_pk,
+                            GroupMember.user_pk.in_([user.user_pk for user in users.values()]),
+                        )
+                    )
+                ).all()
+            )
+            session.add_all(
+                [
                     GroupMember(
                         service_name=self._service_name,
                         account_pk=account.account_pk,
                         group_pk=group.group_pk,
                         user_pk=user.user_pk,
                     )
-                )
+                    for user in users.values()
+                    if user.user_pk not in existing
+                ]
+            )
         return True
 
     async def remove_group_member(self, account_id: str, group_id: str, user_id: str) -> bool:
@@ -1170,13 +1196,29 @@ class MySQLAccountStore(AccountStore):
             await session.delete(group)
 
     async def replace_active_user_api_key(
-        self, account_id: str, user_id: str, api_key: str
+        self, account_id: str, user_id: str, api_key: str,
+        *, expected_api_key: str | None = None,
     ) -> None:
         async with self._transaction() as session:
             account = await self._lock_account(session, account_id)
             self._require_active(account)
             user = await self._lock_user(session, account, user_id)
             self._require_active(user)
+            if expected_api_key is not None:
+                # A locking read observes the current credential, even when a
+                # concurrent reset committed after request authentication.
+                current = await session.scalar(
+                    select(Credential.credential_id)
+                    .where(
+                        Credential.service_name == self._service_name,
+                        Credential.user_pk == user.user_pk,
+                        Credential.revoked.is_(False),
+                        Credential.lookup_digest == _credential_digest(expected_api_key),
+                    )
+                    .with_for_update()
+                )
+                if current is None:
+                    raise UnauthenticatedError("API key is no longer active")
             sequence = await session.scalar(
                 select(func.coalesce(func.max(Credential.sequence), 0)).where(
                     Credential.service_name == self._service_name,

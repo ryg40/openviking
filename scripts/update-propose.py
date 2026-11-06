@@ -18,6 +18,14 @@ class Stop(Exception):
     """A fixed, credential-free refusal reason that can be retained as evidence."""
 
 
+class ApiFailure(Stop):
+    """Retain only the request method and relative path, without query values."""
+
+    def __init__(self, reason, method, path):
+        super().__init__(reason)
+        self.request = {"method": method, "path": urllib.parse.urlsplit(path).path}
+
+
 def require(value, reason):
     if not value:
         raise Stop(reason)
@@ -145,9 +153,13 @@ class Dispatcher:
         except urllib.error.HTTPError as error:
             if method == "GET" and error.code == 404 and path.startswith("/branches/"):
                 return None
-            raise Stop("API request failed with HTTP " + str(error.code)) from None
+            raise ApiFailure(
+                "API request failed with HTTP " + str(error.code), method, path
+            ) from None
         except (OSError, ValueError):
-            raise Stop("API request failed") from None
+            raise ApiFailure("API request failed", method, path) from None
+        except Stop as error:
+            raise ApiFailure(str(error), method, path) from None
 
     def open_rows(self, endpoint):
         for page in range(1, 1001):
@@ -436,6 +448,8 @@ class Dispatcher:
             code = self.dispatch(work, outcome)
         except Stop as error:
             outcome["error"] = str(error)
+            if isinstance(error, ApiFailure):
+                outcome["failed_request"] = error.request
             code = 1
         except Exception as error:
             # Other exception text can contain credentials, response bodies or private URLs.

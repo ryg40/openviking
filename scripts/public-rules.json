@@ -447,7 +447,7 @@
   "github_scripts": {
     ".github/scripts/build-plugin-downloads.sh": {
       "mode": "100755",
-      "blob": "5f7c72c8ac9ee2fe858609cd4ea72e4818b4ecff"
+      "blob": "83a3c1d420f4bed26915708b1215d37a4c1aa7ab"
     },
     ".github/scripts/check-marketplace-archive.mjs": {
       "mode": "100644",
@@ -480,6 +480,14 @@
     ".github/scripts/stamp-installer-version.sh": {
       "mode": "100755",
       "blob": "4558620c3715b20d6c0601dc5b466ef20acd6970"
+    },
+    ".github/scripts/ci_plan.py": {
+      "mode": "100644",
+      "blob": "301229d04b0774e85cc0971bfc97572defe979d2"
+    },
+    ".github/scripts/native_bundle.py": {
+      "mode": "100644",
+      "blob": "dd9ff02d092e75168acc2e6cdb28aaa32d21461f"
     }
   },
   "workflows": [

@@ -3210,6 +3210,20 @@ regexes = [
     '''(?m)^    key = "sk-proj-[1]2345678901234567890_api_key"$''',
     # examples/memory-plugin-shared/capture-utils.test.mjs:249; line hash dcbcb445e9985d6553e6 313a8adec9de4838990e
     '''(?m)^    tool_input: \{ command: "curl -H 'Authorization: sk_[A]BCDEF'", env: \["KEY=sk_[X]YZ"\], timeout: 30 \},$''',
+    # crates/ov_cli/src/commands/admin.rs:595; line hash 441c79946af9775a08af a9c0c8fd0e7d26d2e44e
+    '''(?m)^            \{"user_id": "alice", "role": "admin", "api_key": "[Y]WNtZQ\.YWxpY2U\.abcdefgh"\},$''',
+    # examples/memory-plugin-shared/import-history.test.mjs:166; line hash cad8da69ae05eecb6b0e 6b417cab5f5389d90cca
+    '''(?m)^    "export OPENVIKING_API_KEY=[o]vk\-abcdef123456",$''',
+    # examples/memory-plugin-shared/import-history.test.mjs:168; line hash b7441c02870f25515dbd 0a43715ee1ea5d18e1d5
+    '''(?m)^    '\{"api_key": "[o]vk\-abcdef123456"\}',$''',
+    # examples/memory-plugin-shared/import-history.test.mjs:171; line hash 3e0636ddc9c841a99ed4 38adfa1c69aa10940139
+    '''(?m)^    "AWS [A]KIAABCDEFGHIJKLMNOP",$''',
+    # examples/memory-plugin-shared/import-history.test.mjs:176; line hash 9e97a1cb340065426e31 46a484cee418a28ec320
+    '''(?m)^    assert\.doesNotMatch\(out, /abcdef123456\|ABCDEFGHIJKLMNOPQRSTUVWX\|ABCDEFGHIJKLMNOPQRSTUVWXYZ0123\|[A]KIAABCDEFGHIJKLMNOP/, text\);$''',
+    # crates/ov_cli/src/commands/admin.rs:614; line hash 0127f4bba37268b84bdc 6606c8924c64bfdf9ae1
+    '''(?m)^            \{"user_id": "alice", "role": "admin", "api_key": "[Y]WNtZQ\.YWxpY2U\.abcdefgh"\}$''',
+    # crates/ov_cli/src/commands/admin.rs:631; line hash 0127f4bba37268b84bdc 6606c8924c64bfdf9ae1
+    '''(?m)^            \{"user_id": "alice", "role": "admin", "api_key": "[Y]WNtZQ\.YWxpY2U\.abcdefgh"\}$''',
 ]
 
 [[allowlists]]

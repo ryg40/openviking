@@ -13,6 +13,7 @@ import pytest
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from openviking.server.account_stores.file import FileStore
 from openviking.server.account_stores.mysql import MySQLAccountStore
 from openviking.server.account_stores.mysql_schema import (
     Account,
@@ -21,8 +22,7 @@ from openviking.server.account_stores.mysql_schema import (
     GroupMember,
     User,
 )
-from openviking.server.api_keys import APIKeyManager
-from openviking.server.api_keys.legacy import FileStore
+from openviking.server.api_keys import APIKeyManager, generate_api_key
 from openviking.server.identity import Role
 from openviking.server.store_assembly import build_api_key_manager
 from openviking_cli.exceptions import (
@@ -87,15 +87,16 @@ def test_mysql_account_summary_formats_naive_datetimes_as_utc():
         pytest.param("acme", "u" * 1024, id="long-existing-user"),
     ],
 )
-async def test_legacy_user_without_role_defaults_to_user_during_authentication(account_id, user_id):
+async def test_user_without_role_defaults_to_user_during_authentication(account_id, user_id):
     agfs = InMemoryAGFS()
     agfs.write(
         "/local/_system/accounts.json",
-        json.dumps({"accounts": {account_id: {"created_at": "legacy"}}}).encode(),
+        json.dumps({"accounts": {account_id: {"created_at": "existing"}}}).encode(),
     )
+    api_key = generate_api_key(account_id, user_id)
     agfs.write(
         f"/local/{account_id}/_system/users.json",
-        json.dumps({"users": {user_id: {"key": "legacy-key"}}}).encode(),
+        json.dumps({"users": {user_id: {"key": api_key}}}).encode(),
     )
     manager = build_api_key_manager("root", SimpleNamespace(agfs=agfs))
     await manager.load()
@@ -104,12 +105,31 @@ async def test_legacy_user_without_role_defaults_to_user_during_authentication(a
             "created_accounts": 0,
             "created_users": 0,
         }
-        identity = await manager.resolve_identity("legacy-key")
+        identity = await manager.resolve_identity(api_key)
         assert (identity.account_id, identity.user_id, identity.role) == (
             account_id,
             user_id,
             Role.USER,
         )
+    finally:
+        await manager.close()
+
+
+async def test_legacy_key_format_is_rejected_during_authentication():
+    agfs = InMemoryAGFS()
+    agfs.write(
+        "/local/_system/accounts.json",
+        json.dumps({"accounts": {"acme": {"created_at": "existing"}}}).encode(),
+    )
+    agfs.write(
+        "/local/acme/_system/users.json",
+        json.dumps({"users": {"alice": {"key": "legacy-key", "role": "user"}}}).encode(),
+    )
+    manager = build_api_key_manager("root", SimpleNamespace(agfs=agfs))
+    await manager.load()
+    try:
+        with pytest.raises(UnauthenticatedError):
+            await manager.resolve_identity("legacy-key")
     finally:
         await manager.close()
 
@@ -401,14 +421,22 @@ async def test_distributed_authentication_state_is_shared_and_service_scoped():
             active_key = await writer.regenerate_key("acme", "alice")
         with pytest.raises(UnauthenticatedError):
             await reader.resolve_identity(old_key)
+        await writer.register_user("acme", "bob")
         await writer.create_group("acme", "engineering")
-        await writer.add_group_member("acme", "engineering", "alice")
+        assert await reader.get_user_group_ids("acme", "alice") == ()
+        assert await reader.get_user_group_ids("acme", "bob") == ()
+        with pytest.raises(NotFoundError):
+            await writer.add_group_members("acme", "engineering", ["alice", "missing", "bob"])
+        assert await writer.get_group_members("acme", "engineering") == []
+        await writer.add_group_members("acme", "engineering", ["alice", "bob", "bob"])
         assert await reader.get_user_group_ids("acme", "alice") == ("engineering",)
+        assert await reader.get_user_group_ids("acme", "bob") == ("engineering",)
 
         await writer.delete_group("acme", "engineering")
 
         assert await reader.get_groups("acme") == []
         assert await reader.get_user_group_ids("acme", "alice") == ()
+        assert await reader.get_user_group_ids("acme", "bob") == ()
         assert (await reader.resolve_identity(active_key)).user_id == "alice"
         assert (await isolated.resolve_identity(isolated_key)).role == Role.ADMIN
         async with engine.connect() as connection:
@@ -426,7 +454,7 @@ async def test_distributed_authentication_state_is_shared_and_service_scoped():
                     .select_from(Credential)
                     .where(Credential.service_name == service_name)
                 )
-                == 11
+                == 12
             )
             assert (
                 await connection.scalar(
@@ -434,7 +462,7 @@ async def test_distributed_authentication_state_is_shared_and_service_scoped():
                     .select_from(Credential)
                     .where(Credential.service_name == service_name, Credential.revoked.is_(False))
                 )
-                == 1
+                == 2
             )
     finally:
         try:
@@ -532,9 +560,8 @@ async def test_group_deletion_preserves_users_and_persists_membership_removal():
         bob_key = await manager.register_user("acme", "bob")
         await manager.create_group("acme", "engineering")
         await manager.create_group("acme", "reviewers")
-        await manager.add_group_member("acme", "engineering", "alice")
-        await manager.add_group_member("acme", "engineering", "bob")
-        await manager.add_group_member("acme", "reviewers", "bob")
+        await manager.add_group_members("acme", "engineering", ["alice", "bob"])
+        await manager.add_group_members("acme", "reviewers", ["bob"])
         assert await manager.get_user_group_ids("acme", "bob") == (
             "engineering",
             "reviewers",
