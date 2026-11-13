@@ -124,7 +124,12 @@ lines = []
 for path, number in re.findall(r"# ([^;]+):([0-9]+); line hash", block):
     all_lines = (source / path).read_text().splitlines(keepends=True)
     # The curl rule starts on the preceding line and spans two source lines.
-    lines.append("".join(all_lines[int(number) - (2 if number == "77" else 1):int(number)]))
+    multiline = (path, number) in {
+        ("tests/unit/test_privacy_rules.py", "77"),
+        ("docs/en/api/08-admin.md", "91"),
+        ("docs/en/api/08-admin.md", "122"),
+    }
+    lines.append("".join(all_lines[int(number) - (2 if multiline else 1):int(number)]))
 (work / "exact-fixtures.txt").write_text("".join(lines))
 PY
 new_repo "$work/exact-fixtures"
@@ -138,6 +143,9 @@ p = pathlib.Path(sys.argv[1])
 s = p.read_text().replace("ABCDEFGHIJKLMNOP", "ABCDEFGHIJKLMNOQ")
 s = s.replace("{BODY}", "{CHANGED}").replace("1234567890abcd", "1234567890abce")
 s = s.replace("_api_key", "_api_keZ").replace("ABCDEF'", "ABCDEG'")
+s = s.replace("your-admin-api-key", "your-admin-api-keZ")
+s = s.replace("your-root-api-key", "your-root-api-keZ")
+s = s.replace("ov-bob-" + "secret-9012", "ov-bob-" + "secret-9013")
 p.write_text(s)
 PY
 g -C "$work/exact-fixtures" add fixture.txt

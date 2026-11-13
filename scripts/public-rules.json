@@ -445,6 +445,10 @@
     }
   ],
   "github_scripts": {
+    ".github/scripts/database_integration.py": {
+      "mode": "100644",
+      "blob": "0136607c0ffdaf801016bc7d1d8caef6fc666a3c"
+    },
     ".github/scripts/build-plugin-downloads.sh": {
       "mode": "100755",
       "blob": "83a3c1d420f4bed26915708b1215d37a4c1aa7ab"
@@ -483,7 +487,7 @@
     },
     ".github/scripts/ci_plan.py": {
       "mode": "100644",
-      "blob": "301229d04b0774e85cc0971bfc97572defe979d2"
+      "blob": "80de5a798205f90fb577f4a69e6b853eafb96c1b"
     },
     ".github/scripts/native_bundle.py": {
       "mode": "100644",

@@ -9,7 +9,7 @@ viking://{scope}/{path}
 ```
 
 - **scheme**: Always `viking`
-- **scope**: Top-level namespace (`resources`, `user`, `agent`; `temp`, `queue`, and `upload` are internal)
+- **scope**: Top-level namespace (`resources`, `user`, `agent`, `system`; `temp`, `queue`, and `upload` are internal)
 - **path**: Resource path within the scope
 
 ## Scopes
@@ -19,12 +19,13 @@ viking://{scope}/{path}
 | **resources** | Independent resources / objective knowledge | Long-term | Account global |
 | **user** | User-level data, including sessions | Long-term / session lifetime | Current user |
 | **agent** | Account-shared skills and Agent configuration; endpoint, tool, and payment directories are planned | Long-term | Account global |
+| **system** | Account system assets: memory templates, official example skills, and global skills | Long-term | Account global; all built-in roles read; ROOT writes; ADMIN writes only below `viking://system/memory/memory_templates/custom/` and in `viking://system/compile/global` |
 | **queue** | Processing queue | Temporary | Internal |
 | **temp** | Temporary files | During parsing | Internal |
 | **upload** | Temporary upload files | Temporary | Internal |
 
 Public API and CLI filesystem/content operations accept the public scopes
-`resources`, `user`, and `agent`, plus the root URI `viking://`. Session data lives
+`resources`, `user`, `agent`, and `system`, plus the root URI `viking://`. Session data lives
 under `viking://user/{user_id}/sessions`.
 `temp`, `queue`, and `upload` are internal implementation
 scopes and cannot be addressed directly through public API URI parameters.

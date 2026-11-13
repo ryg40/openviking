@@ -9,7 +9,7 @@ viking://{scope}/{path}
 ```
 
 - **scheme**: 始终为 `viking`
-- **scope**: 顶级命名空间（`resources`、`user`、`agent`；`temp`、`queue` 和 `upload` 为内部作用域）
+- **scope**: 顶级命名空间（`resources`、`user`、`agent`、`system`；`temp`、`queue` 和 `upload` 为内部作用域）
 - **path**: 作用域内的资源路径
 
 ## 作用域
@@ -19,11 +19,12 @@ viking://{scope}/{path}
 | **resources** | 独立资源/客观知识 | 长期 | account 全局 |
 | **user** | 用户级数据，包括 session | 长期 / 会话生命周期 | 当前用户 |
 | **agent** | 账户共享技能与 Agent 配置；端点、工具和支付目录为规划用途 | 长期 | account 全局 |
+| **system** | 账户系统资产：记忆模板、官方示例技能和全局技能 | 长期 | account 全局；所有内置角色可读；ROOT 可写；ADMIN 只能写 `viking://system/memory/memory_templates/custom/` 之下和 `viking://system/compile/global` 之内的内容 |
 | **queue** | 处理队列 | 临时 | 内部 |
 | **temp** | 临时文件 | 解析期间 | 内部 |
 | **upload** | 临时上传文件 | 临时 | 内部 |
 
-公开 API 和 CLI 的文件系统/内容操作接受公开作用域 `resources`、`user` 和 `agent`，
+公开 API 和 CLI 的文件系统/内容操作接受公开作用域 `resources`、`user`、`agent` 和 `system`，
 以及根 URI `viking://`。Session 数据位于 `viking://user/{user_id}/sessions`。
 `temp`、`queue` 和 `upload` 是内部实现作用域，不能通过公开 API 的 URI 参数直接访问。
 

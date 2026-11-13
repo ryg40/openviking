@@ -86,12 +86,13 @@ The `github_scripts` map lists each retained upstream helper's path, Git mode an
 An empty map is an error.
 Each listed helper must be tracked with its exact mode and blob hash.
 No other GitHub path is accepted.
-The current tree retains eleven helpers used by upstream packaging tests, plugin tests and their helper calls.
+The current tree retains twelve helpers used by upstream packaging, plugin and database contract tests.
 The channel generator is deleted because its only caller is a deleted upstream release workflow.
 The host-compatibility helper and its JSON configuration are deleted because no retained executable file calls them.
 The download builder and archive checker stay because the shared plugin tests call both helpers.
 The plugin-version checker is deleted because no retained executable file calls it.
 The CI planner and native bundle helper stay because retained packaging tests call them.
+The database integration helper stays because retained tests check its coverage verifier.
 The upstream CI guide, actionlint configuration, composite actions and desktop smoke helper are deleted with their workflows.
 
 The deletion list has one repository-relative path per line.

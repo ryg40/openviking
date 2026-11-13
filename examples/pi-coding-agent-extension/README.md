@@ -15,7 +15,7 @@ Long-term semantic memory and context takeover for [pi](https://github.com/earen
 ### Prerequisites
 
 - **pi coding agent** installed (`npm i -g @earendil-works/pi-coding-agent`)
-- **Node.js 22.19.0+** and **npm**
+- **Node.js 24.0.0+** and **npm** (local fork: the `engines` field of `package.json` requires `>=24.0.0`)
 - **An OpenViking server** reachable — local or remote
 
 ### 1. Have an OpenViking server reachable
@@ -191,8 +191,8 @@ integrations should configure category `quotas` when they need exact ceilings.
 
 ### Context takeover
 
-Takeover is disabled by default; Pi manages compaction. The local fork also requires an explicit configuration setting,
-`takeoverEnabled` or `OPENVIKING_TAKEOVER`. When enabled, OpenViking commits archived history, reads the
+Takeover is disabled by default; Pi manages compaction. Only an explicit configuration setting,
+`takeoverEnabled` or `OPENVIKING_TAKEOVER`, turns it on. When enabled, OpenViking commits archived history, reads the
 overview of that exact archive, then the `context` hook replaces covered
 conversation turns with a synthetic `[OpenViking Session Context]` user message
 while keeping the recent live tail. The boundary advances only after every
@@ -267,6 +267,14 @@ Bypass now runs through the same matcher every other OpenViking harness uses, so
 
 The extension's TypeScript files are loaded by pi's `jiti` transpiler without a build step. Recall, session sync, context takeover and the startup health check use the REST API. Model-facing tools use the official `@modelcontextprotocol/client` SDK over Streamable HTTP and mirror the server's `/mcp` catalogue. Configuration and identity headers reuse the shared library.
 
+The MCP client is pinned to `2.3.0` to fix [GHSA-6prh-2h8m-c8cw](https://github.com/advisories/GHSA-6prh-2h8m-c8cw).
+Its default redirect policy blocks requests to a different origin (scheme, host, or port), including identity headers, session identifiers, and tool arguments.
+Configure the final MCP URL if a server redirects to another origin. Do not enable `redirectPolicy: 'follow'`; it restores the exposure.
+Update installed extensions separately, then restart Pi. A server update alone does not replace the extension's dependencies.
+
+The local HTTP tests in `tests/mcp-redirect-security.test.mjs` check blocked cross-origin redirects, redirect chains, and allowed same-origin redirects.
+These tests use synthetic credentials and no live OpenViking server.
+
 MCP initialization and tool discovery share a 5-second deadline. Each tool call uses `timeoutMs` (15 seconds by default), including any reconnection. Credentials and connection settings are reloaded before calls; a transport failure is returned immediately and the next call reconnects. Calls are never automatically replayed. Cancellation ends the client's wait and cannot undo a write already accepted by the server.
 
 Arguments are checked against the server's original schema before pi's own validation. Invalid nulls, scalar-to-array substitutions and stringified JSON are rejected rather than repaired. Text results share a 50 KiB / 2000-line limit across all content blocks.
@@ -330,7 +338,15 @@ Against a current server, that is these 16:
 
 That table is a snapshot of one server, not a contract; `/viking` reports how many tools registered against your own.
 
-The extension also ships the `openviking-memory`, `openviking-skills`, and `ov-experience-memory` skills, which tell the model when to use which of these tools. It adds them through pi's `resources_discover` event, and leaves them out when `mcpEnabled` is `false`.
+The extension also ships the `openviking-memory`, `openviking-skills`, `ov-experience-memory`, and `openviking-rule-search` skills, which tell the model when to use which of these tools. It adds them through pi's `resources_discover` event, and leaves them out when `mcpEnabled` is `false`.
+
+On a server advertising `rule_search`, `openviking_rule_search` takes `task_context`
+and an optional `rule_probability_threshold` (default `0.65`). It returns complete
+compiled Rules for a constraint check before a planned action or response.
+Rule results share the 50 KiB / 2,000-line inline budget. Delivery stops between
+complete Rule blocks so no condition or exception is cut off; omitted Rules are
+explicitly marked with `delivery.complete=false` and a retrieval URI when available.
+Check remaining Rules before acting. Reconnect after a server upgrade to refresh the tools.
 
 The canonical `/viking` command (type `/viking` in pi's chat) displays connection status, session info, how many tools registered — or the handshake error when none did — and accepts `commit` for manual synchronous commit.
 
@@ -363,18 +379,22 @@ A failed handshake never fails startup: recall, session sync and takeover keep w
 This branch is a local fork of the upstream extension. It differs from
 upstream in four points:
 
-- `takeoverEnabled` defaults to `false` (`loadLocalConfig` in `config.ts`).
-  Takeover runs only when a configuration layer or `OPENVIKING_TAKEOVER` turns
-  it on. `loadConfig` itself stays equal to the shared loader.
+- `index.ts` loads its settings with `loadLocalConfig` in `config.ts`. It sets
+  `takeoverEnabled` to `false` unless a configuration layer or
+  `OPENVIKING_TAKEOVER` sets it. The shared schema default is also `false`
+  (upstream v0.5.0 and later), so the result equals the upstream result today.
+  The guard keeps takeover off if a later shared default changes. `loadConfig`
+  itself stays equal to the shared loader.
 - Tool result output is not captured unless `captureToolResults` is `true`, and
   credential fields and values in tool inputs and outputs are redacted
   (`lib/capture-utils-local.mjs`, used by `lib/capture-adapter.mjs`).
 - `captureMode: "keyword"` keeps a turn only when it matches a durable-memory
   trigger (`lib/capture-utils-local.mjs`).
-- Additive mode (takeover off) persists its capture watermark as an
-  `ov-sync-watermark` custom entry, so a `pi -c` process does not resend the
-  whole branch, and `ensureSession` reads the session with `auto_create` and
-  fails closed when the server cannot create or read it (`sync.ts`, `index.ts`).
+- Legacy additive `ov-sync-watermark` entries migrate into the upstream
+  branch-aware `ov-capture` checkpoints at unforked startup. Modern checkpoints
+  take precedence, and forked sessions capture their own inherited history.
+  `ensureSession` reads the session with `auto_create` and fails closed when
+  the server cannot create or read it (`sync.ts`, `index.ts`).
 
 To update an installed copy at `~/.pi/agent/extensions/openviking`:
 
@@ -394,11 +414,17 @@ To update an installed copy at `~/.pi/agent/extensions/openviking`:
 6. Move each non-default value from the old `config.json` into the `plugin.pi`
    section of `~/.openviking/ovcli.conf`. This code does not read `config.json`
    any more; the file stays only as a record. Keep takeover off: set
-   `"takeoverEnabled": false` in `plugin.pi`, or leave it unset (the fork
-   default is `false`), and do not set `OPENVIKING_TAKEOVER`.
-7. Start `pi` and run `/viking`. The status must show takeover off and the
-   `openviking_*` tools registered. Rename any `viking_*` entries in
-   `--tools` / `--exclude-tools` allowlists (see "Upgrading from 0.3.x").
+   `"takeoverEnabled": false` in `plugin.pi`, or leave it unset (the default
+   is `false`), and do not set `OPENVIKING_TAKEOVER`.
+7. Start `pi` and run `/viking`. The reply has no takeover field when takeover
+   is off; it adds a `takeover:` segment only when takeover is on. The reply
+   must show `tools:` with a number, the count of registered `openviking_*`
+   tools. A reply of `tools: none` (with a reason) or
+   `tools: disabled by mcpEnabled` means that the tools did not register.
+   The status line also shows the mode: `✎ <commitTokenThreshold>` when
+   takeover is off, `ctx <turns> · ~<tokens>/<threshold>` when it is on.
+   Rename any `viking_*` entries in `--tools` / `--exclude-tools` allowlists
+   (see "Upgrading from 0.3.x").
 
 ## Compared to Pi's Built-in Memory
 

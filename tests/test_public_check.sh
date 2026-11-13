@@ -579,7 +579,7 @@ fixture_entries = re.findall(
     r"# ([^;]+); line hash ([0-9a-f]{20}) ([0-9a-f]{20})\n\s*'''([^\n]+)'''",
     fixture_block,
 )
-control("all exact scanner fixture lines have hashes", len(fixture_entries) == 12)
+control("all exact scanner fixture lines have hashes", len(fixture_entries) == 15)
 for location, first, last, pattern in fixture_entries:
     path, number = location.rsplit(":", 1)
     line = Path(path).read_text().splitlines(keepends=True)[int(number) - 1]
@@ -591,6 +591,9 @@ for location, first, last, pattern in fixture_entries:
     changed = changed.replace("1234567890abcd", "1234567890abce").replace("_api_key", "_api_keZ")
     changed = changed.replace("ABCDEF", "ABCDEG")
     changed = changed.replace("YWNtZQ", "YWNtZR").replace("ovk-abcdef", "ovk-abcdff")
+    changed = changed.replace("your-admin-api-key", "your-admin-api-keZ")
+    changed = changed.replace("your-root-api-key", "your-root-api-keZ")
+    changed = changed.replace("secret-9012", "secret-9013")
     control("changed scanner fixture rejected " + location, expression.search(changed) is None)
     control("adjacent scanner value rejected " + location, expression.search("other " + line.lstrip()) is None)
 

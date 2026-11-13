@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { restoreAdditiveSyncWatermark, SyncManager, describeCommitError } from "../sync.ts";
+import { SyncManager, describeCommitError } from "../sync.ts";
 import { OVClient } from "../client.ts";
 import { enqueue, listPending } from "../shared/pending-queue.mjs";
 
@@ -67,14 +67,36 @@ test("ensureSession fails closed when OpenViking cannot create or read the sessi
   assert.equal(sync.sessionId, null);
 });
 
-test("restoreAdditiveSyncWatermark reads the latest persisted custom entry", () => {
-  const branch = [
-    { type: "custom", customType: "ov-sync-watermark", data: { syncedEntryCount: 2 } },
-    { type: "message", message: { role: "user", content: "new" } },
-    { customType: "ov-sync-watermark", data: { syncedEntryCount: 7 } },
-  ];
-  assert.equal(restoreAdditiveSyncWatermark(branch), 7);
-  assert.equal(restoreAdditiveSyncWatermark([]), 0);
+test("legacy additive checkpoints migrate without replay and never suppress fork capture", async () => {
+  await withPendingDir(async () => {
+    const branch = [
+      captureEntry("old"),
+      { id: "legacy", type: "custom", customType: "ov-sync-watermark", data: { version: 1, syncedEntryCount: 1 } },
+      captureEntry("new"),
+    ];
+    const sync = new SyncManager(client(), config({ takeoverEnabled: false }), (customType, data) => {
+      branch.push({ id: "modern", type: "custom", customType, data });
+    });
+    await sync.ensureSession("migration");
+    sync.restoreCapture(branch, true);
+    assert.equal(sync.syncedCount, 1);
+    assert.equal((await sync.syncBranch(branch.slice())).added, 1);
+    assert.equal(branch.at(-1).customType, "ov-capture");
+    branch.push({ id: "stale", type: "custom", customType: "ov-sync-watermark", data: { syncedEntryCount: 0 } });
+    const resumed = new SyncManager(client(), config({ takeoverEnabled: false }));
+    await resumed.ensureSession("migration");
+    resumed.restoreCapture(branch, true);
+    assert.equal(resumed.syncedCount, 3, "modern progress wins over a later legacy checkpoint");
+    assert.equal((await resumed.syncBranch(branch.slice())).added, 0);
+    const fork = new SyncManager(client(), config({ takeoverEnabled: false }));
+    await fork.ensureSession("fork");
+    fork.restoreCapture(branch, false);
+    assert.equal((await fork.syncBranch(branch.slice())).added, 2);
+    for (const count of [-1, 2, 1.5, "1", null]) {
+      resumed.restoreCapture([branch[0], { id: "invalid", type: "custom", customType: "ov-sync-watermark", data: { syncedEntryCount: count } }], true);
+      assert.equal(resumed.syncedCount, 0, "invalid legacy offsets must not suppress capture");
+    }
+  });
 });
 
 test("syncBranch returns added token accounting and delivered status", async () => {
@@ -91,6 +113,102 @@ test("syncBranch returns added token accounting and delivered status", async () 
     assert.ok(result.tokens > 0);
     assert.equal(result.allDelivered, true);
     assert.equal(sync.syncedCount, 1);
+  });
+});
+
+function captureEntry(id) {
+  return { id, type: "message", message: { role: "user", content: `Remember the project decision ${id}.` } };
+}
+
+for (const takeoverEnabled of [false, true]) {
+  test(`capture checkpoints survive restart, compaction and branch navigation (takeover=${takeoverEnabled})`, async () => {
+    await withPendingDir(async () => {
+      let branch = [captureEntry("shared"), captureEntry("a")];
+      const sent = [];
+      const c = client({ fetchJSON: async (_path, init) => {
+        sent.push(...JSON.parse(init.body).messages);
+        return { ok: true, result: {} };
+      } });
+      let sequence = 0;
+      const makeSync = async (sid = "checkpoint-session") => {
+        const sync = new SyncManager(c, config({ takeoverEnabled }), (customType, data) => {
+          branch.push({ id: `checkpoint-${++sequence}`, type: "custom", customType, data });
+        });
+        await sync.ensureSession(sid);
+        sync.restoreCapture(branch);
+        return sync;
+      };
+      await (await makeSync()).syncBranch(branch.slice());
+      const a = branch.slice();
+      const restarted = await makeSync();
+      branch.push({ id: "compact", type: "compaction", firstKeptEntryId: "a", summary: "summary" }, captureEntry("a2"));
+      assert.equal((await restarted.syncBranch(branch.slice())).added, 1);
+      // A longer sibling still has unseen entries below the old array offset.
+      branch = [a[0], ...["b", "b2", "b3", "b4", "b5"].map(captureEntry)];
+      assert.equal((await restarted.syncBranch(branch.slice())).added, 6);
+      branch = a.slice();
+      assert.equal((await restarted.syncBranch(branch.slice())).added, 0);
+      assert.equal(branch.length, a.length, "syncing a checkpoint adds no checkpoint-only chain");
+      branch.push(captureEntry("a3"));
+      assert.equal((await restarted.syncBranch(branch.slice())).added, 1);
+      assert.equal(sent.filter((p) => JSON.stringify(p).includes("decision a.")).length, 1);
+      const fork = await makeSync("fork-session");
+      assert.equal((await fork.syncBranch(branch.slice())).added, 3, "fork must capture its own inherited history");
+    });
+  });
+}
+
+test("capture migration rejects foreign, invalid and off-branch checkpoints", async () => {
+  const sync = new SyncManager(client(), config());
+  await sync.ensureSession("migration");
+  const legacy = [captureEntry("one"), { id: "legacy", type: "custom", customType: "ov-takeover", data: { syncedEntryCount: 1 } }];
+  sync.restoreCapture(legacy, true);
+  assert.equal(sync.syncedCount, 1);
+  sync.restoreCapture(legacy, false);
+  assert.equal(sync.syncedCount, 0, "fork must not trust a session-less legacy checkpoint");
+  for (const data of [
+    { sessionId: "pi-other", lastEntryId: "one" },
+    { sessionId: "pi-migration", lastEntryId: "missing" },
+    { sessionId: "pi-migration", lastEntryId: "later" },
+    { sessionId: "pi-migration" },
+  ]) {
+    sync.restoreCapture([legacy[0], { id: "invalid", type: "custom", customType: "ov-capture", data }, captureEntry("later")]);
+    assert.equal(sync.syncedCount, 0);
+  }
+  sync.restoreCapture([
+    legacy[0],
+    { id: "modern", type: "custom", customType: "ov-capture", data: { sessionId: "pi-migration", lastEntryId: "one" } },
+    { id: "stale", type: "custom", customType: "ov-takeover", data: { syncedEntryCount: 0 } },
+  ], true);
+  assert.equal(sync.syncedCount, 1, "modern progress takes precedence over legacy takeover state");
+});
+
+test("durably queued capture is checkpointed before a failed commit check", async () => {
+  await withPendingDir(async () => {
+    const branch = [captureEntry("queued")];
+    const cfg = config({ takeoverEnabled: false });
+    const unavailable = client({ fetchJSON: async () => ({ ok: false, status: 503 }) });
+    const sync = new SyncManager(unavailable, cfg, (customType, data) => {
+      branch.push({ id: "checkpoint", type: "custom", customType, data });
+    });
+    await sync.ensureSession("offline");
+    const result = await sync.syncBranch(branch.slice());
+    assert.equal(result.queued, 1);
+    assert.equal((await listPending()).length, 1);
+    const restored = new SyncManager(client(), cfg);
+    await restored.ensureSession("offline");
+    restored.restoreCapture(branch);
+    assert.equal((await restored.syncBranch(branch)).added, 0);
+    const failingClient = client();
+    const failingCommit = new SyncManager(failingClient, cfg,
+      (customType, data) => branch.push({ id: "checkpoint-2", type: "custom", customType, data }));
+    await failingCommit.ensureSession("offline");
+    failingClient.getSession = async () => { throw new Error("commit unavailable"); };
+    failingCommit.restoreCapture(branch);
+    branch.push(captureEntry("after"));
+    await assert.rejects(failingCommit.syncBranch(branch.slice()), /commit unavailable/);
+    restored.restoreCapture(branch);
+    assert.equal((await restored.syncBranch(branch)).added, 0);
   });
 });
 

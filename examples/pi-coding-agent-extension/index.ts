@@ -18,11 +18,7 @@ import { EXTENSION_VERSION, loadConfig, loadLocalConfig, buildBridgeProxyConfig,
 import { OVClient } from "./client.js";
 import { RecallManager } from "./recall.js";
 import { RecallLedger } from "./lib/recall-ledger.mjs";
-import {
-  ADDITIVE_SYNC_ENTRY_TYPE,
-  restoreAdditiveSyncWatermark,
-  SyncManager,
-} from "./sync.js";
+import { SyncManager } from "./sync.js";
 import { buildProfileBlock } from "./shared/profile-inject.mjs";
 import { isBypassed } from "./shared/session-model.mjs";
 import { guardVikingUriToolCall, noticeVikingUriToolResult } from "./lib/uri-guard-adapter.mjs";
@@ -53,7 +49,7 @@ export default async function (pi: ExtensionAPI) {
 
   // --- Initialize modules ---
   const client = new OVClient(config);
-  const sync = new SyncManager(client, config);
+  const sync = new SyncManager(client, config, (type, data) => pi.appendEntry(type, data));
   const recall = new RecallManager(
     client,
     config,
@@ -192,12 +188,8 @@ export default async function (pi: ExtensionAPI) {
         : [];
       if (config.takeoverEnabled) {
         takeover.restore(branch);
-        sync.restoreWatermark(takeover.state.syncedEntryCount, branch);
-      } else {
-        // Local fork: additive mode keeps its own persisted capture watermark.
-        // Without it, every `pi -c` process would resend the full branch.
-        sync.restoreWatermark(restoreAdditiveSyncWatermark(branch), branch);
       }
+      sync.restoreCapture(branch, !ctx.sessionManager.getHeader?.()?.parentSession);
 
       await sync.replayPending();
       if (config.takeoverEnabled && sync.droppedCount > 0) {
@@ -383,12 +375,6 @@ export default async function (pi: ExtensionAPI) {
     // The branch is what the boundary is frozen against and re-confirmed on, so
     // takeover needs it, not just the token delta.
     await takeover.onTurnSynced(result.tokens, () => ctx.sessionManager.getBranch(), { deadline });
-    if (!config.takeoverEnabled && typeof pi?.appendEntry === "function") {
-      pi.appendEntry(ADDITIVE_SYNC_ENTRY_TYPE, {
-        version: 1,
-        syncedEntryCount: sync.syncedCount,
-      });
-    }
     updateStatus(ctx, connected, result.added, sync.sessionId, config, takeover.state, toolsReady);
   });
 

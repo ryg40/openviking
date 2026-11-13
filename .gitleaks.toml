@@ -3224,6 +3224,12 @@ regexes = [
     '''(?m)^            \{"user_id": "alice", "role": "admin", "api_key": "[Y]WNtZQ\.YWxpY2U\.abcdefgh"\}$''',
     # crates/ov_cli/src/commands/admin.rs:631; line hash 0127f4bba37268b84bdc 6606c8924c64bfdf9ae1
     '''(?m)^            \{"user_id": "alice", "role": "admin", "api_key": "[Y]WNtZQ\.YWxpY2U\.abcdefgh"\}$''',
+    # docs/en/api/08-admin.md:91; line hash 3497e1a927d0e2968a3b 6b1083139d2c46adaebd
+    '''(?m)^  -H "X-API-Key: [y]our-admin-api-key" \\$''',
+    # docs/en/api/08-admin.md:122; line hash bc091c3e8887812951ed 56294b595c308bcb769c
+    '''(?m)^  -H 'X-API-Key: [y]our-root-api-key'$''',
+    # web-studio/src/features/connection/components/studio-api-key-menu.test.tsx:106; line hash c30f6bc04a098a462441 6d23806627912c6937cb
+    '''(?m)^  state\.connection\.apiKey = 'ov-bob-secret-[9]012'$''',
 ]
 
 [[allowlists]]

@@ -57,7 +57,7 @@
             "pool_size": 32,
             "connect_timeout_ms": 1000,
             "command_timeout_ms": 1000,
-            "default_ttl_seconds": 3600,
+            "default_ttl_seconds": 300,
         },
     },
     "storage": {
@@ -92,8 +92,6 @@
             },
             "cachefs": {
                 "backend": "local",
-                "max_file_size_bytes": 1048576,
-                "bypass_prefixes": ["/queue", "/tmp"],
             },
             "queuefs": {
                 "backend": "sqlite",
@@ -114,6 +112,24 @@
                 "disable_batch_delete": false,
             },
         },
+    },
+    "git": {
+        "enabled": true,
+        "backend": "local",
+        "default_branch": "main",
+        "author_name": "viking-bot",
+        "author_email": "bot@viking.local",
+        "local": {
+            "base_dir": ""
+        },
+        "snapshot": {
+            "log": {
+                "provider": "sqlite",
+                "sqlite": {
+                    "path": "/data/openviking/_system/snapshot/log/snapshot_log.db"
+                }
+            }
+        }
     },
     "queue_workers": {
         "external_parse": {"max_concurrent": 4},

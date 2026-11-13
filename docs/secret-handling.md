@@ -128,6 +128,7 @@ The output line `scan: <n> finding(s) in upstream content accepted (...)` gives 
 
 Five additional upstream fixture lines have exact, anchored line exceptions with their line hashes recorded in `.gitleaks.toml`.
 They cover synthetic AWS credentials, a formatted curl user value, two test keys and a captured tool command.
+Later exact entries cover CLI and history-import fixtures, two admin API documentation placeholders, and a Studio user-switch test key.
 The exceptions do not accept changed values or adjacent secret lines.
 `tests/test_public_check.sh` checks each line hash and its negative controls; the scanner suite checks actual findings.
 
@@ -150,6 +151,14 @@ A hardcoded secret in an upstream file gets no allowlist entry. It is removed fr
 | --- | --- | --- | --- |
 | `benchmark/locomo/openclaw/run_full_eval.sh` | `GATEWAY_TOKEN` comes from the environment; the script stops when it is empty. The header shows its use. No hardcoded token remains in the file. | Upstream history still holds the value. Keep that history on the private development branch, not `portable`. | When the file conflicts, keep the local line. |
 
+### Protocol address constants
+
+The cloud metadata deny set in `openviking/utils/network_guard.py` uses numeric IPv4 and IPv6 constructors.
+The values identify the public Alibaba ECS and EC2 IPv6 metadata protocols, not deployment hosts.
+The constructors preserve the upstream addresses and rejection behavior without literal private-address strings in source or bytecode.
+The upstream network-guard tests check those endpoints using their standard textual forms.
+No image scanner rule or host-value exception changes.
+
 ### Upstream archive
 
 | Blob | Path | Reason |
@@ -159,6 +168,7 @@ A hardcoded secret in an upstream file gets no allowlist entry. It is removed fr
 The baseline also accepts three upstream SQL source files by exact path and blob: account initialization, its migration template and task-store initialization.
 These files define schemas and contain no row data.
 They are `openviking/server/account_stores/sql/init.sql`, `openviking/server/account_stores/sql/changes/0000_template.sql` and `openviking/service/sql/task_store_init.sql`.
+The MySQL Watch schema `openviking/service/sql/001_watch_tasks.sql` also contains only table and index definitions.
 An `archive` line of `scripts/upstream-base` names the exact blob and path.
 A changed file or a copy at another path is a policy finding.
 

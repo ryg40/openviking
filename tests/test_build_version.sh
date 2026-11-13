@@ -58,6 +58,9 @@ work=$tmp/work
 mkdir "$work"
 (cd "$repo" && git ls-files -z | tar --null -T - -cf -) | tar -xf - -C "$work"
 git -C "$work" init -q
+# The fixture owns its lifetime; background maintenance must not race cleanup.
+git -C "$work" config gc.auto 0
+git -C "$work" config maintenance.auto false
 git -C "$work" symbolic-ref HEAD refs/heads/portable
 git -C "$work" add -A
 git -C "$work" commit -q -m 'Promote test'

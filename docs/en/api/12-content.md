@@ -150,7 +150,7 @@ Read the complete text of an L0, L1, or L2 file.
 
 - `read()` accepts file URIs only. Passing an existing directory URI returns `INVALID_ARGUMENT` (`400`), not `NOT_FOUND`. This error carries a structured `details` payload — `details.expected` is `"file"`, `details.actual` is `"directory"`, and `details.resource` is the offending URI (present on the HTTP path) — so clients can detect a file-vs-directory mismatch programmatically (for example, fall back to `list`) instead of string-matching the message.
 - Instead of a Viking URI, you may pass the 32-character hex `id` returned by `stat()` for a file. The server looks up the URI via the vector index and applies the same permission checks. Because indexing is asynchronous, a newly returned ID might not be resolvable immediately; lookup also fails if the corresponding vector record has been deleted. In both cases, the server returns `NOT_FOUND` and indicates that the data may not have been indexed yet or may have been deleted.
-- Public URI parameters accept `resources`, `user`, and `agent` scopes. For session files, use `viking://user/{user_id}/sessions/{session_id}/messages.jsonl` or the current user's `viking://~/sessions/{session_id}/messages.jsonl` home alias. The old `viking://session/...` scope and internal scopes such as `temp` and `queue` return `INVALID_URI`.
+- Public URI parameters accept `resources`, `user`, `agent`, and `system` scopes. For session files, use `viking://user/{user_id}/sessions/{session_id}/messages.jsonl` or the current user's `viking://~/sessions/{session_id}/messages.jsonl` home alias. The old `viking://session/...` scope and internal scopes such as `temp` and `queue` return `INVALID_URI`.
 - Sensitive information handling: default reads (`raw=false`) preserve existing placeholders and sanitize remaining registered plaintext values; `raw=true` skips default sanitization and returns the restored content. Restoration affects only the response, not stored files; see [Privacy Configs](../concepts/13-privacy.md).
 
 **Python SDK**
@@ -607,7 +607,7 @@ Content-Type: application/json
 
 ### set_tags()
 
-Set explicit `k=v` tags used by retrieval filters. `replace` replaces existing tags, `append` adds tags, and `clear` explicitly removes existing tags. When the target is a directory, `recursive=true` applies the update to files below it. Omitting `tags`, or passing an empty list with `replace`, is a no-op; only `clear` removes tags and it ignores any supplied tag values.
+Set explicit tags used by retrieval filters. `replace` replaces existing tags, `append` applies ordered `k=v`, `k+=number`, and `k-=number` patches, and `clear` removes existing tags. Arithmetic uses finite decimal values, treats a missing key as zero, and may produce negative results. It is a read-modify-write operation, not an atomic increment. When the target is a directory, `recursive=true` applies the update to files below it.
 
 **Python SDK**
 
@@ -618,6 +618,12 @@ result = client.set_tags(
     mode="replace",
     recursive=True,
 )
+
+batch = client.batch_set_tags(
+    ["viking://resources/project/a.md", "viking://resources/project/b.md"],
+    ["used_count+=1"],
+    mode="append",
+)
 ```
 
 **TypeScript SDK**
@@ -627,6 +633,11 @@ const result = await client.setTags(
   "viking://resources/project/",
   ["team=search", "env=prod"],
   { mode: "replace", recursive: true },
+);
+const batch = await client.batchSetTags(
+  ["viking://resources/project/a.md", "viking://resources/project/b.md"],
+  ["used_count+=1"],
+  { mode: "append" },
 );
 ```
 
@@ -639,12 +650,19 @@ result, err := client.SetTags(
     []string{"team=search", "env=prod"},
     &openviking.SetTagsOptions{Mode: "replace", Recursive: true},
 )
+batch, err := client.BatchSetTags(
+    ctx,
+    []string{"viking://resources/project/a.md", "viking://resources/project/b.md"},
+    []string{"used_count+=1"},
+    &openviking.SetTagsOptions{Mode: "append"},
+)
 ```
 
 **HTTP API**
 
 ```http
 POST /api/v1/content/set_tags
+POST /api/v1/content/batch_set_tags
 Content-Type: application/json
 ```
 
@@ -662,6 +680,8 @@ curl -X POST http://localhost:1933/api/v1/content/set_tags \
 
 `POST /api/v1/fs/attrs/set_tags` is an equivalent compatibility path currently used by the Python, TypeScript, and Go SDKs and the CLI.
 
+The batch endpoint accepts 1-50 URIs and returns `items` plus `failed`. A target with no semantic record is a successful item with `tags_updated=false`; only actual errors appear in `failed`.
+
 **CLI**
 
 ```bash
@@ -669,6 +689,10 @@ ov set-tags viking://resources/project/ \
   --tags team=search,env=prod \
   --mode replace \
   --recursive
+
+ov attrs batch-set-tags \
+  viking://resources/project/a.md viking://resources/project/b.md \
+  --tags used_count+=1 --mode append
 ```
 
 **Response**
