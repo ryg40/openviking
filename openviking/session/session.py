@@ -39,7 +39,10 @@ from openviking.message import Message, Part
 from openviking.message.part import TextPart, ToolPart
 from openviking.privacy.sanitizer import PrivacySanitizer
 from openviking.privacy.service import UserPrivacyConfigService
-from openviking.privacy.session_extractor import extract_and_store_session_privacy
+from openviking.privacy.session_extractor import (
+    extract_and_store_session_privacy,
+    restore_foreign_session_references,
+)
 from openviking.server.config import ToolOutputExternalizationConfig
 from openviking.server.error_mapping import map_exception
 from openviking.server.identity import RequestContext, Role
@@ -2859,19 +2862,23 @@ class Session:
                     allowed_peer_ids = extraction_scope.allowed_peer_ids
                     long_term_memory_types = extraction_scope.memory_types
 
-                    long_term_messages = [
-                        message
-                        for message in extraction_messages
-                        if message.id not in completed_memory_steps.get("long_term", set())
-                    ]
-
+                    completed_long_term_ids = completed_memory_steps.get("long_term", set())
                     long_term_has_work = (
                         memory_extraction_enabled
                         and (self_memory_enabled or allowed_peer_ids)
                         and (long_term_memory_types is None or bool(long_term_memory_types))
-                        and bool(long_term_messages)
+                        and any(
+                            msg.id not in completed_long_term_ids for msg in extraction_messages
+                        )
                     )
                     if enable_working_memory or (self._session_compressor and long_term_has_work):
+                        if self._privacy_config_service is not None:
+                            extraction_messages = await restore_foreign_session_references(
+                                extraction_messages,
+                                self.ctx,
+                                self._privacy_config_service,
+                                session_id=self.session_id,
+                            )
                         logger.info(
                             "Starting post-commit extraction from %s archived messages",
                             len(messages),
@@ -2884,6 +2891,11 @@ class Session:
                             extraction_labels.append("archive_summary")
 
                         if self._session_compressor and long_term_has_work:
+                            long_term_messages = [
+                                msg
+                                for msg in extraction_messages
+                                if msg.id not in completed_long_term_ids
+                            ]
 
                             async def _run_long_term_memory_extraction(
                                 batch_messages: Optional[List[Message]] = None,

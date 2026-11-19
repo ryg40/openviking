@@ -38,6 +38,25 @@ async def test_user_and_public_content_writes_replace_registered_privacy_values(
         assert stored == f"credential={reference}"
 
 
+async def test_user_wide_writes_and_visible_reads_exclude_session_values(service):
+    ctx = RequestContext(user=service.user, role=Role.USER)
+    session_value = "invented-session-phrase"
+    credential_value = "invented-managed-value"
+    await service.privacy_configs.upsert(ctx, "session", "source", {"AbCd1234": session_value})
+    await service.privacy_configs.upsert(ctx, "credential", "demo", {"key": credential_value})
+    reference = build_privacy_field_reference(ctx.user.user_id, "credential", "demo", "key")
+    content = f"{session_value} {credential_value}"
+    expected = f"{session_value} {reference}"
+
+    uri = "viking://resources/privacy-scope.md"
+    await service.fs.write(uri, content, ctx=ctx, wait=False)
+    assert await service.viking_fs.read_file(uri, ctx=ctx) == expected
+
+    legacy_uri = "viking://resources/legacy-privacy-scope.md"
+    await service.viking_fs.write_file(legacy_uri, content.encode("utf-8"), ctx=ctx)
+    assert await service.fs.read_visible(legacy_uri, ctx=ctx) == expected
+
+
 async def test_service_components_share_one_privacy_sanitizer(service):
     assert service.privacy_sanitizer is not None
     assert service.fs._privacy_sanitizer is service.privacy_sanitizer

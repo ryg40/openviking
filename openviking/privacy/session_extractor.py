@@ -10,8 +10,10 @@ from dataclasses import dataclass, replace
 from secrets import token_urlsafe
 from typing import Any, TypeVar
 
+from openviking.message import Message
 from openviking.message.part import ContextPart, ImagePart, Part, TextPart, ToolPart
 from openviking.privacy.reference import parse_privacy_field_reference
+from openviking.privacy.restore import PrivacyRestorer
 from openviking.privacy.rules import (
     MAX_MATCHES,
     MAX_TEXT_CHARS,
@@ -27,6 +29,9 @@ from openviking_cli.exceptions import (
     InvalidArgumentError,
     ResourceExhaustedError,
 )
+from openviking_cli.utils import get_logger
+
+logger = get_logger(__name__)
 
 MAX_BATCH_CHARS = 16 * 1024 * 1024
 MAX_DEPTH = 32
@@ -115,7 +120,9 @@ async def _prepare_session_matcher(
     """Use Session placeholders for matching eight-character fields in this Session."""
     if sanitizer is None:
         return lambda _: []
-    matcher = await sanitizer.prepare_matcher(ctx, prefer_credentials=True)
+    matcher = await sanitizer.prepare_matcher(
+        ctx, prefer_credentials=True, session_target_key=target_key
+    )
 
     def find(text: str) -> list[PrivacyReplacement]:
         matches: list[PrivacyReplacement] = []
@@ -228,6 +235,69 @@ class _PayloadTransformer:
                 copied["parts"] = parts
             result.append(copied)
         return result
+
+
+class _SessionPayloadTextMapper(_PayloadTransformer):
+    def __init__(self, map_text: Callable[[str], str]):
+        super().__init__()
+        self._map_text = map_text
+
+    def transform_text(self, text: _Text) -> _Text:
+        return self._map_text(text) if text is not None else text
+
+    def transform_part(self, part: Part) -> Part:
+        return super().transform_part(replace(part))
+
+
+def _is_token_like(value: str) -> bool:
+    # Leave likely credentials protected before the text can reach a model.
+    return (
+        len(value) >= 20
+        and all(char.isalpha() or char.isdigit() or char in "_-" for char in value)
+        and any(char.isalpha() for char in value)
+        and any(char.isdigit() for char in value)
+    )
+
+
+async def restore_foreign_session_references(
+    messages: list[Message],
+    ctx: RequestContext,
+    privacy: UserPrivacyConfigService,
+    *,
+    session_id: str,
+) -> list[Message]:
+    """Restore legacy cross-session matches on a best-effort extraction copy."""
+    try:
+        target_key = session_privacy_target(session_id)
+        restorer = PrivacyRestorer(
+            privacy,
+            ctx,
+            category="session",
+            target_key=target_key,
+            reference_filter=lambda ref: ref.category == "session" and ref.target_key != target_key,
+        )
+        collector = _SessionPayloadTextMapper(restorer.collect_text)
+        for msg in messages:
+            for part in msg.parts:
+                collector.transform_part(part)
+
+        # The old user-wide matcher emitted references only for non-empty strings.
+        await restorer.load_values(
+            value_filter=lambda value: (
+                isinstance(value, str) and value != "" and not _is_token_like(value)
+            )
+        )
+        if not restorer.values:
+            return messages
+        mapper = _SessionPayloadTextMapper(restorer.restore_text)
+        return [
+            replace(msg, parts=[mapper.transform_part(part) for part in msg.parts])
+            for msg in messages
+        ]
+    except Exception:
+        # A partial restore must not replace the extraction input or fail the commit.
+        logger.warning("Could not restore foreign session references; using original messages")
+        return messages
 
 
 class _SessionExtraction(_PayloadTransformer):

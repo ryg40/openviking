@@ -123,7 +123,8 @@ class SearchService:
         ):
             raise InvalidArgumentError(
                 "Keyword search is not supported by the configured vector backend, or full-text "
-                "indexing is not enabled for the content field."
+                "indexing is not enabled for the content field. Use search_type='semantic' "
+                "or the grep tool instead."
             )
 
     async def _resolve_image_url(

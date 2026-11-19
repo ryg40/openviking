@@ -424,6 +424,111 @@
       "reason": "Exact upstream session implementation reference; not a private tracker reference."
     },
     {
+      "rule": "private-tracker",
+      "line_blob": "0dde2b5e715fed5a3cdf2734c6cc7a0084113532",
+      "reason": "Upstream text names the commit phase, not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "8075d90a51623f403c2db56355ef511a2f37d7a2",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "770fb5f7dbe9fd8029962ccabf7b82fe26ef1dc6",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "c136bc33999ecbdc9baf500e447d9b6254ee459f",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "819c35b049fab2421a64f08d6c344aaf44c558cc",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "0b026442e11ce6c2219c01df7e0b25af9de60b80",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "f81cbc50756da7a966f1b91abea192203383c362",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "020593013a6e0158806bce5cd9555af86e2f0a8f",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "0e3d088fa8491a6700374c8d85961bf99499b761",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "372413ea11e486db79efe0951296a49029e21983",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "fe7ec5bb55e1e6f1220cb39535f790c7162e4ceb",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "9d6c6585ccabfc2da3954003d31c805f07b4b6d6",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "33520a6b3613e473c4af0fc00c461133b4d24fd9",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "41e0c9f125a023314dc305f807194887c8330074",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "9f9640c2ba8ddf658d956c73667243774d7b6449",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "5fd1dda379b6b9adaeaf51463b03b74ee139df99",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "f0483d03287701ef3c83c78473edbbd3e7106763",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "7c5e2925bc3d8efa9104f378eb3d57830845a817",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "b66cd22d854d296b5ad8ea2d3acde9d8e3f29681",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "7217e4233a070fbd55f8e762cacf34209fd43cdd",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
+      "rule": "private-tracker",
+      "line_blob": "6afd9e4ae56c6db8a4afae54c8561da81bd907a0",
+      "reason": "Exact upstream session implementation reference; not a private tracker reference."
+    },
+    {
       "rule": "document-code-path",
       "line_blob": "72ca94d91d46299eeba47386d7b0831a1a9493e2",
       "reason": "Sync table explicitly records the deleted upstream channel generator."
@@ -442,6 +547,136 @@
       "rule": "document-code-path",
       "line_blob": "b08364eab30ab6be87fe9a670114aa2b1eccd348",
       "reason": "Sync table explicitly records deliberately deleted upstream paths."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "eace525d273898034a8a66c0218f587ee60120ff",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "53275a8661c6086b025e638f67baa5499ce85872",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "1207a865e06302f309342cfb65a561581634fb6d",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "aebce849a6c851e36d091f9458b76b298a9e0d42",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "d421cef61f10912e020aadf09f0211f1ba27c2aa",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "58e2ccce340a6a12b34498a2c12920337541308c",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "4c73cbfb04b9ad8cc14e7d60d8e4b5ef6bea96a0",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "2f6e640b02bb5605cf3e4eab6c25c6ba8c54dd16",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "6a191553aa7ce856b493b09cd965e376960b8774",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "0377916a5f388bf8df4e3ef1c5fbea3658f2a76b",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "8168b0f4e044861be9e4c57f5e08bd90e5b05cf0",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "7d1557857e34749a0efa3da998daee29ec53f25a",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "246e9529b19e00c099ee0de5bc83c58ce7b5b499",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "4bb1189ebc1bed4fd3f1789b1b3019b21303bea4",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "24503afe1b0211413e79e0f35bd6e68f92b4174d",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "f49b8aacdb733b63590f91930d6a8fe99011d419",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "6bfa6cb34be3735c61a662adf16dd84e071c9b4a",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "5c40765f2db14c0063809c9f0c45875f0003d9a7",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "6436e4552bb89ddc6a723175688657ccd1569c2d",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "b2d85b3bc2a0bd5a88c1630d69abb3962f8205a0",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "2cec4ec9687dd6ad4ebb9fe0427c92a7a01ff192",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "e67c4b48e3e0dff5695b0520cbfa60b3d01c2399",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "ef0cc27214eba4e697b7194894a7149967b3c704",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "298cf0628d620f10641127e6a1a1925f7be715a3",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "2e28eff576109df1830064eaeaa967c1ec2a5d3a",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
+    },
+    {
+      "rule": "development-process",
+      "line_blob": "8b5d4a0b13be60676b4ae82fe46f38f1dfa3b90c",
+      "reason": "Exact upstream test line that names a ContentWriteCoordinator variable; not a development role."
     }
   ],
   "github_scripts": {

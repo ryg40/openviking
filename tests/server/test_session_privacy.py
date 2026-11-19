@@ -3,6 +3,7 @@
 """Protect Session persistence and restore only on explicit raw reads."""
 
 import asyncio
+import hashlib
 import json
 from copy import deepcopy
 from dataclasses import asdict
@@ -21,6 +22,9 @@ from openviking.privacy.session_extractor import (
 from openviking.privacy.session_restore import restore_session_content
 from openviking.server.config import ToolOutputExternalizationConfig
 from openviking.server.identity import RequestContext, Role
+from openviking.service.task_tracker import TaskStatus, get_task_tracker
+from openviking.session import Session
+from openviking.session.memory.memory_updater import ExtractContext
 from openviking_cli.exceptions import InvalidArgumentError, ResourceExhaustedError
 from openviking_cli.session.user_id import UserIdentifier
 
@@ -82,6 +86,116 @@ async def test_http_skips_discovery_but_protects_registered_values(
     stored_output = await service.viking_fs.read_file(output_uri, ctx=ctx)
     assert stored_output == output.replace("registered-secret", reference)
     assert await service.fs.read(output_uri, ctx=ctx) == output
+
+
+async def test_registered_session_value_matches_only_its_own_session(service, ctx):
+    owner = await service.sessions.create(ctx, "scope-owner")
+    other = await service.sessions.create(ctx, "scope-other")
+    field = "AbCd1234"
+    value = "invented-session-phrase"
+    await service.privacy_configs.upsert(ctx, "session", owner.session_id, {field: value})
+
+    for session, expected in (
+        (owner, build_session_placeholder(owner.session_id, field)),
+        (other, value),
+    ):
+        await session.add_message_async("user", [TextPart(value)])
+        stored = await service.viking_fs.read_file(session.uri + "/messages.jsonl", ctx=ctx)
+        assert json.loads(stored)["parts"][0]["text"] == expected
+
+
+@pytest.mark.parametrize("retry", [False, True], ids=["word-on-commit", "word-on-retry"])
+async def test_extraction_restores_only_word_like_foreign_session_references(
+    service, ctx, monkeypatch, retry
+):
+    session = await service.sessions.create(ctx, "extract-destination")
+    foreign = "extract-source"
+    await service.privacy_configs.upsert(
+        ctx, "session", foreign, {"AbCd1234": "meadow", "QrSt9012": "fixture-token-123456"}
+    )
+    await service.privacy_configs.upsert(
+        ctx, "session", session.session_id, {"EfGh5678": "orchard"}
+    )
+    word_ref = build_privacy_field_reference(ctx.user.user_id, "session", foreign, "AbCd1234")
+    token_ref = build_privacy_field_reference(ctx.user.user_id, "session", foreign, "QrSt9012")
+    own_ref = build_privacy_field_reference(
+        ctx.user.user_id, "session", session.session_id, "EfGh5678"
+    )
+    original = f"Notes: {word_ref} {token_ref} {own_ref}"
+    expected = f"Notes: meadow {token_ref} {own_ref}"
+    message = await session.add_message_async("user", [TextPart(original)])
+    raw = await service.viking_fs.read_file(f"{session.uri}/messages.jsonl", ctx=ctx)
+    assert json.loads(raw)["parts"][0]["text"] == original
+
+    summary = AsyncMock(return_value="")
+    extract = AsyncMock(
+        return_value=[], side_effect=RuntimeError("invented extraction failure") if retry else None
+    )
+    monkeypatch.setattr(Session, "_generate_archive_summary_async", summary)
+    monkeypatch.setattr(service.sessions._session_compressor, "extract_long_term_memories", extract)
+    tracker = get_task_tracker()
+    result = await session.commit_async(enable_working_memory=True)
+    task = await tracker.wait(result["task_id"], ctx.account_id, ctx.user.user_id, timeout=10)
+    archive_uri = result["archive_uri"]
+    archive_file = f"{archive_uri}/messages.jsonl"
+    archived = await service.viking_fs.read_file(archive_file, ctx=ctx)
+    assert archived == raw
+
+    if retry:
+        assert task.status is TaskStatus.FAILED
+        summary.reset_mock()
+        extract.reset_mock(side_effect=True)
+        retried = await service.sessions.retry_archive(
+            session.session_id,
+            archive_uri.rsplit("/", 1)[-1],
+            ctx,
+            expected_messages_sha256=hashlib.sha256(archived.encode()).hexdigest(),
+        )
+        assert retried["status"] == "accepted"
+        task = await tracker.wait(retried["task_id"], ctx.account_id, ctx.user.user_id, timeout=10)
+
+    assert task.status is TaskStatus.COMPLETED, task
+    summarised = summary.call_args.args[0]
+    extracted = extract.call_args.kwargs["messages"]
+    assert [(msg.id, msg.content) for msg in summarised] == [(message.id, expected)]
+    assert [(msg.id, msg.content) for msg in extracted] == [(message.id, expected)]
+    assert ExtractContext(extracted).get_event_content("0", "summary", 0) == f"**user**: {expected}"
+    assert await service.viking_fs.read_file(archive_file, ctx=ctx) == archived
+
+
+async def test_commit_keeps_extraction_messages_on_privacy_lookup_error(service, ctx, monkeypatch):
+    session = await service.sessions.create(ctx, "extract-lookup-destination")
+    await service.privacy_configs.upsert(ctx, "session", "readable-source", {"AbCd1234": "meadow"})
+    readable_ref = build_privacy_field_reference(
+        ctx.user.user_id, "session", "readable-source", "AbCd1234"
+    )
+    unreadable_ref = build_privacy_field_reference(
+        ctx.user.user_id, "session", "unreadable-source", "EfGh5678"
+    )
+    original = f"Notes: {readable_ref} {unreadable_ref}"
+    message = await session.add_message_async("user", [TextPart(original)])
+
+    get_current = service.privacy_configs.get_current
+
+    async def read_current(ctx, category, target_key):
+        if category == "session" and target_key == "unreadable-source":
+            raise PermissionError("invented privacy read failure")
+        return await get_current(ctx, category, target_key)
+
+    summary = AsyncMock(return_value="")
+    extract = AsyncMock(return_value=[])
+    monkeypatch.setattr(service.privacy_configs, "get_current", read_current)
+    monkeypatch.setattr(Session, "_generate_archive_summary_async", summary)
+    monkeypatch.setattr(service.sessions._session_compressor, "extract_long_term_memories", extract)
+
+    result = await session.commit_async(enable_working_memory=True)
+    task = await get_task_tracker().wait(
+        result["task_id"], ctx.account_id, ctx.user.user_id, timeout=10
+    )
+
+    assert task.status is TaskStatus.COMPLETED, task
+    for messages in (summary.call_args.args[0], extract.call_args.kwargs["messages"]):
+        assert [(msg.id, msg.content) for msg in messages] == [(message.id, original)]
 
 
 @pytest.mark.usefixtures("enable_session_privacy_discovery")
@@ -406,7 +520,9 @@ async def test_auto_created_session_extracts_before_persistence(service, ctx):
     ["中文会话", "team session@@group", " leading and trailing ", "x" * 300, "group:100%~"],
 )
 @pytest.mark.usefixtures("enable_session_privacy_discovery")
-async def test_custom_session_ids_support_privacy_and_cross_session_reuse(service, ctx, sid):
+async def test_custom_session_ids_support_privacy_and_cross_session_reference_restore(
+    service, ctx, sid
+):
     session = await service.sessions.create(ctx, sid)
     await session.add_message_async("user", [TextPart("password=custom-session-secret")])
     target_key = session_privacy_target(sid)
@@ -421,8 +537,8 @@ async def test_custom_session_ids_support_privacy_and_cross_session_reuse(servic
     restored = await service.fs.read(uri, ctx=ctx)
     assert json.loads(restored)["parts"][0]["text"] == "password=custom-session-secret"
     target = await service.sessions.create(ctx, "reuse-custom-id")
-    await target.add_message_async("user", [TextPart("password=custom-session-secret")])
     reference = build_privacy_field_reference(ctx.user.user_id, "session", target_key, field)
+    await target.add_message_async("user", [TextPart(f"password={reference}")])
     assert target.messages[0].parts[0].text == f"password={reference}"
     restored = await service.fs.read(target.uri + "/messages.jsonl", ctx=ctx)
     assert json.loads(restored)["parts"][0]["text"] == "password=custom-session-secret"
@@ -603,9 +719,7 @@ async def test_later_credential_registration_preserves_session_reference_identit
 
 
 @pytest.mark.usefixtures("enable_session_privacy_discovery")
-async def test_cross_session_reuse_requires_full_reference_but_short_reference_stays_local(
-    service, ctx
-):
+async def test_cross_session_restore_resolves_full_reference_but_not_short_reference(service, ctx):
     source = await service.sessions.create(ctx, "source")
     original = "password=cross-session-secret"
     await source.add_message_async("user", [TextPart(original)])
@@ -614,7 +728,7 @@ async def test_cross_session_reuse_requires_full_reference_but_short_reference_s
     short = build_session_placeholder("source", field)
     full = build_privacy_field_reference(ctx.user.user_id, "session", "source", field)
     target = await service.sessions.create(ctx, "target")
-    await target.add_message_async("user", [TextPart(f"{original} {short}")])
+    await target.add_message_async("user", [TextPart(f"password={full} {short}")])
     assert target.messages[0].parts[0].text == f"password={full} {short}"
     raw = json.loads(await service.fs.read(target.uri + "/messages.jsonl", ctx=ctx))
     assert raw["parts"][0]["text"] == f"{original} {short}"

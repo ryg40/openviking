@@ -209,7 +209,7 @@ def context_only_fields_error(supplied_fields, as_named_by_caller=None) -> Optio
     names = sorted(
         {name for field in used for name in ((as_named_by_caller or {}).get(field) or {field})}
     )
-    return f"{', '.join(names)} require mode='context'; set mode='context' or drop these fields"
+    return f"{', '.join(names)} require mode='context'; in list mode, omit these fields"
 
 
 class SearchRequest(BaseModel):

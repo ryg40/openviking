@@ -65,7 +65,7 @@ The Python helper is `scripts/public_check.py`.
 | `work-record` | A date together with work-record wording on the same line. A date alone is accepted. |
 | `development-process` | Generic personal development roles and session wording. Git branch names alone are accepted. |
 | `machine-path` | Home directories and deployment directories outside the repository. Standard build-cache paths are accepted. |
-| `document-link`, `document-anchor`, `document-reference` | Relative Markdown links, reference definitions, HTML links and images, and Markdown heading or HTML anchors. |
+| `document-link`, `document-anchor`, `document-reference` | Relative Markdown links, reference definitions, HTML links and images, and Markdown heading or HTML anchors. A heading anchor of a docs site page (below `docs/`, except the `srcExclude` directories of `docs/.vitepress/config.ts`) follows VitePress 1.6.4: its slug function, a trailing `{#id}` heading id, and `-1`, `-2` for a repeated heading. A heading anchor of another file follows GitHub. |
 | `document-code-path` | Standalone path spans in the install section of `README.md`, in `EXPLAINER.md` and in root-level Markdown documents under `docs/`. |
 | `freshness-default`, `freshness-source` | Variable table cells against source expressions in Compose, the environment template, the bake file, the Dockerfile, scripts and tests. |
 | `freshness-scanner`, `freshness-image` | Scanner lookup commands against the source assignment; the three stage image cells against Dockerfile defaults. |

@@ -3,6 +3,7 @@
 """Resolve Privacy references to the current user's active values."""
 
 import re
+from collections.abc import Callable
 from typing import Any, Literal
 
 from openviking.privacy.models import UserPrivacyConfigVersion
@@ -25,11 +26,13 @@ class PrivacyRestorer:
         *,
         category: Literal["skill", "session"],
         target_key: str,
+        reference_filter: Callable[[PrivacyFieldReference], bool] | None = None,
     ):
         self._privacy = privacy
         self._ctx = ctx
         self._category = category
         self._target_key = target_key
+        self._reference_filter = reference_filter
         field = r"([^}:]+)" if category == "skill" else r"([A-Za-z0-9_-]{8})"
         self._placeholder = re.compile(
             r"\{\{ov_privacy:" + category + ":" + re.escape(target_key) + ":" + field + r"\}\}"
@@ -57,6 +60,8 @@ class PrivacyRestorer:
                         )
                 if location is None or location.owner_user_id != self._ctx.user.user_id:
                     continue
+                if self._reference_filter is not None and not self._reference_filter(location):
+                    continue
                 self._targets.add((location.category, location.target_key))
                 if len(self._targets) > MAX_RESTORE_TARGETS:
                     raise ResourceExhaustedError("Privacy reference target limit exceeded")
@@ -75,14 +80,17 @@ class PrivacyRestorer:
                 self._configs[target] = None
         return self._configs[target]
 
-    async def load_values(self) -> None:
+    async def load_values(self, *, value_filter: Callable[[Any], bool] | None = None) -> None:
         """Load active values for the collected fields."""
         for placeholder, location in self.fields.items():
             current = await self.get_current(location.category, location.target_key)
             if current is None or location.field not in current.values:
                 continue
             value = current.values[location.field]
-            if value is None or value == "":
+            if value_filter is not None:
+                if not value_filter(value):
+                    continue
+            elif value is None or value == "":
                 continue
             self.values[placeholder] = value
 

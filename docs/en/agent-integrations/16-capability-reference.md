@@ -356,7 +356,7 @@ Thresholds in this table are client-side. They read the server's pending-token c
 | CodeBuddy Code | `Stop` after 8 captured messages since the last commit | `SessionEnd` (interactive TUI only) commits everything not yet committed, including messages `Stop` already sent; `SessionStart` replays queued writes | `PreCompact` commits everything not yet committed |
 | OpenCode | v1 `session.idle`, v2 end of execution: at 20,000 pending tokens | Session deletion, v1 `session.error`, v1 dispose, and v2 cleanup force a commit | v1 before and after compaction; v2 once after compaction ends |
 | DSH | `turn/end` at 20,000 pending tokens | Cordis teardown commits each session | `compaction/start` commits without the threshold check |
-| pi, takeover on (default) | Locally estimated 30,000 tokens with more than 3 user turns | `/viking commit` | `session_before_compact` |
+| pi, takeover on (opt-in) | Locally estimated 30,000 tokens with more than 3 user turns | `/viking commit` | `session_before_compact` |
 | pi, takeover off | 20,000 pending tokens after each sync | `session_shutdown` and `/viking commit` | `session_before_compact` |
 | OpenClaw | After a turn, at `tokenBudget × commitTokenThresholdRatio` (128,000 × 0.5 by default) | `/new`, `/reset`, and `memory_store` commit and wait | `compact()` commits and waits up to 5 minutes for extraction |
 | Hermes (bundled) | None | Session end, session switch (`/new`, `/resume`, `/branch`, fork-style compaction), gateway cache eviction, and an exit handler; `/undo` and in-place compaction do not commit | At fork-style compaction only |
@@ -436,7 +436,7 @@ When the host shortens its context, most integrations make sure the dropped mess
 | Kimi Code | Host summarizes | `PreCompact` commits | Nothing |
 | OpenCode | Host summarizes | v1 flushes and commits; v2 captures the transcript | v1 commits again on `session.compacted`; v2 commits after `session.compaction.ended` |
 | DSH | Host summarizes | `compaction/start` commits regardless of the token threshold. Injected context is a user message and shrinks with the host's compaction; the profile is not sent again | Nothing |
-| pi | Takeover, on by default | Commits and waits for the archive overview | The overview replaces pi's summary; on failure pi compacts as usual |
+| pi | Takeover, opt-in | Commits and waits for the archive overview | The overview replaces pi's summary; on failure pi compacts as usual |
 | OpenClaw | The plugin owns compaction | `compact()` commits and waits | The next context assembly rebuilds history from the server |
 | Hermes (bundled) | Host summarizes | Fork-style compaction commits the old session; in-place compaction does nothing | Nothing |
 

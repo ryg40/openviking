@@ -29,7 +29,6 @@ from openviking_cli.exceptions import (
     ConflictError,
     InvalidArgumentError,
     NotFoundError,
-    PermissionDeniedError,
 )
 from openviking_cli.session.user_id import UserIdentifier
 from tests.test_task_tracker import _FakeAgfs
@@ -201,10 +200,11 @@ async def test_system_batch_write_is_file_only_without_queue_work(
         "viking://system/memory/memory_templates/builtin",
     ],
 )
-async def test_system_builtin_batch_write_rejects_external_root_writes(
+async def test_system_builtin_batch_write_accepts_root(
     _coordinator_queue_for_unit_tests,
     root,
 ):
+    # ROOT manages the whole system namespace; test_viking_fs_system_permissions holds the rule.
     uri = f"{root}/demo/assets/icon.bin"
     content = b"\x89PNG\r\n\x1a\nasset"
     vfs = _VFS(root)
@@ -212,23 +212,21 @@ async def test_system_builtin_batch_write_rejects_external_root_writes(
     coordinator = ContentWriteCoordinator(vfs)
     ctx = RequestContext(user=UserIdentifier.the_default_user(), role=Role.ROOT)
 
-    with pytest.raises(PermissionDeniedError):
-        await coordinator.batch_write(
-            root_uri=root,
-            operations=[
-                {
-                    "uri": uri,
-                    "content_base64": base64.b64encode(content).decode("ascii"),
-                    "mode": "replace",
-                }
-            ],
-            ctx=ctx,
-            wait=False,
-        )
+    result = await coordinator.batch_write(
+        root_uri=root,
+        operations=[
+            {
+                "uri": uri,
+                "content_base64": base64.b64encode(content).decode("ascii"),
+                "mode": "replace",
+            }
+        ],
+        ctx=ctx,
+        wait=False,
+    )
 
-    assert vfs.files == {}
-    assert vfs._async_agfs.paths == []
-    _coordinator_queue_for_unit_tests.content_write.enqueue.assert_not_awaited()
+    assert result["created"] == [uri]
+    assert vfs.files[uri] == content
     _coordinator_queue_for_unit_tests.semantic.enqueue.assert_not_awaited()
 
 

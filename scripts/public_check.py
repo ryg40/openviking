@@ -2,12 +2,14 @@
 """Offline checks for the tracked public checkout; no source values in reports."""
 
 import hashlib
+import html
 import json
 import os
 import re
 import subprocess
 import sys
 import traceback
+import unicodedata
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlsplit
 
@@ -45,15 +47,56 @@ def unfence(text):
     return "".join(output)
 
 
-def anchors(text):
+def site_page(path):
+    # Pages of the VitePress site: srcDir `docs`, srcExclude in docs/.vitepress/config.ts.
+    parts = PurePosixPath(path).parts
+    return (
+        len(parts) > 1
+        and parts[0] == "docs"
+        and parts[1] not in ("repository", "review", "images")
+        and not any(p.startswith(".") for p in parts)
+    )
+
+
+def site_slug(title):
+    # VitePress 1.6.4: markdown-it-anchor over the text and code_inline tokens, then slugify.
+    text = ""
+    for i, part in enumerate(re.split(r"(`+[^`]*?`+)", title)):
+        if i % 2:
+            text += part.strip("`")
+            continue
+        part = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", part)
+        part = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", part)
+        part = re.sub(r"<[^>]+>", "", part).replace("*", "")
+        text += html.unescape(re.sub(r"\\(.)", r"\1", part))
+    text = re.sub(r"[̀-ͯ]", "", unicodedata.normalize("NFKD", text))
+    text = re.sub(r"[\u0000-\u001f]", "", text)
+    text = re.sub(r"[\s~`!@#$%^&*()\-_+=[\]{}|\\;:\"'“”‘’<>,.?/]+", "-", text)
+    text = re.sub(r"-{2,}", "-", text).strip("-")
+    return re.sub(r"^(\d)", r"_\1", text).lower()
+
+
+def anchors(text, site=False):
     result = set(re.findall(r"<(?:a|h[1-6])\b[^>]*\bid=[\"\x27]([^\"\x27]+)", text, re.I))
     seen = {}
     for match in re.finditer(r"^#{1,6}\s+(.+?)\s*#*\s*$", unfence(text), re.M):
-        title = re.sub(r"<[^>]+>", "", match[1]).lower()
-        title = re.sub(r"[^\w\- ]", "", title).replace(" ", "-")
-        n = seen.get(title, 0)
-        seen[title] = n + 1
-        result.add(title + (f"-{n}" if n else ""))
+        if not site:
+            title = re.sub(r"<[^>]+>", "", match[1]).lower()
+            title = re.sub(r"[^\w\- ]", "", title).replace(" ", "-")
+            n = seen.get(title, 0)
+            seen[title] = n + 1
+            result.add(title + (f"-{n}" if n else ""))
+            continue
+        # markdown-it-attrs reads a trailing `{#id}`; markdown-it-anchor then counts from -1.
+        attrs = re.search(r"\s*\{([^{}]*)\}$", match[1])
+        explicit = attrs and re.search(r"(?:^|\s)#([^\s#.]+)", attrs[1])
+        title = match[1][: attrs.start()] if attrs else match[1]
+        slug = base = explicit[1] if explicit else site_slug(title)
+        n = 1
+        while slug in seen:
+            slug, n = f"{base}-{n}", n + 1
+        seen[slug] = True
+        result.add(slug)
     return result
 
 
@@ -438,7 +481,7 @@ class Check:
         if not self.exists(dest):
             self.finding(source, number, "document-link")
         elif parts.fragment and dest.endswith(".md"):
-            if parts.fragment not in anchors(self.text(dest)):
+            if parts.fragment not in anchors(self.text(dest), site_page(dest)):
                 self.finding(source, number, "document-anchor")
 
     def documents(self):

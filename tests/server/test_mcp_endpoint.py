@@ -886,6 +886,37 @@ async def test_find_tool_inlines_visible_content_when_requested(service, monkeyp
     assert "Use the read tool" not in result
 
 
+async def test_search_list_truncates_long_hit_abstracts(service, monkeypatch):
+    long_preview = "\u754c" * 600
+    hits = [
+        SimpleNamespace(
+            uri="viking://user/test_user/memories/long.md",
+            abstract=long_preview + "outside the preview",
+            score=0.9,
+        ),
+        SimpleNamespace(
+            uri="viking://user/test_user/memories/short.md",
+            abstract="A short abstract.",
+            score=0.8,
+        ),
+    ]
+
+    async def fake_search(**kwargs):
+        return SimpleNamespace(memories=hits, resources=[], skills=[])
+
+    monkeypatch.setattr(service.search, "search", fake_search)
+
+    result = await search(query="memory", mode="list")
+
+    long_line, short_line = [
+        line.strip() for line in result.splitlines() if line.startswith("    ")
+    ]
+    assert long_line.partition("...")[0] == long_preview
+    assert "outside the preview" not in long_line
+    assert "`read`" in long_line and "URI" in long_line
+    assert short_line == "A short abstract."
+
+
 async def test_search_tool_rejects_read_content_in_context_mode():
     with pytest.raises(InvalidArgumentError, match="read_content"):
         await mcp_endpoint.search(query="visible", mode="context", read_content=True)
@@ -1037,6 +1068,13 @@ async def test_search_context_schema_uses_portable_scalar_types():
     assert properties["other_peer_penalties"]["type"] == "object"
     assert properties["rewrite"]["type"] == "string"
     assert properties["rewrite"]["enum"] == ["off", "auto"]
+
+
+async def test_search_schema_describes_max_tokens_as_context_only():
+    tools = {tool.name: tool for tool in await mcp_endpoint.mcp.list_tools()}
+    max_tokens = tools["search"].inputSchema["properties"]["max_tokens"]
+
+    assert "mode='context'" in max_tokens["description"]
 
 
 async def test_mcp_middleware_sets_actor_peer_context():

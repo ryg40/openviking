@@ -141,6 +141,31 @@ mutate(
 mutate("undefined reference", "sample.md", lambda _: "[x][missing]\n", "document-reference")
 mutate("HTML link", "sample.md", lambda _: '<a href="absent.md">x</a>\n', "document-link")
 mutate("fragment", "sample.md", lambda _: "[x](README.md#no-such-heading)\n", "document-anchor")
+# Pages below docs/ use the VitePress anchors of the docs site; other files keep GitHub anchors.
+for name, page in [
+    ("site anchor drops underscore and parentheses", "### read_tool_result()\n[x](#read-tool-result)\n"),
+    ("site anchor turns a dot into a dash", "## CLI 2.0\n[x](#cli-2-0)\n"),
+    ("site anchor prefixes a leading digit", "### 4.2 Credentials\n[x](#_4-2-credentials)\n"),
+    ("site anchor reads an explicit heading id", "## Desktop app {#desk}\n[x](#desk)\n"),
+    ("site anchor counts a repeated heading from one", "## Same\n## Same\n[x](#same-1)\n"),
+    ("site anchor keeps inline code text", "## The `a_b` key\n[x](#the-a-b-key)\n"),
+]:
+    mutate(name, "docs/sample.md", lambda _, page=page: page, None, 0)
+for name, path, page in [
+    ("site page rejects a GitHub anchor", "docs/sample.md", "### read_tool_result()\n[x](#read_tool_result)\n"),
+    ("explicit heading id replaces the slug", "docs/sample.md", "## Desktop app {#desk}\n[x](#desktop-app)\n"),
+    ("site page rejects a missing anchor", "docs/sample.md", "## Same\n[x](#same-1)\n"),
+    ("page outside docs keeps GitHub anchors", "sample.md", "### read_tool_result()\n[x](#read-tool-result)\n"),
+    ("excluded docs directory keeps GitHub anchors", "docs/repository/sample.md", "## CLI 2.0\n[x](#cli-2-0)\n"),
+]:
+    mutate(name, path, lambda _, page=page: page, "document-anchor")
+mutate(
+    "page outside docs accepts a GitHub anchor",
+    "sample.md",
+    lambda _: "### read_tool_result()\n[x](#read_tool_result)\n",
+    None,
+    0,
+)
 mutate("code path", "docs/sample.md", lambda _: "`scripts/absent.sh`\n", "document-code-path")
 mutate(
     "external link and fenced sample",

@@ -661,28 +661,77 @@ _MCP_CONTEXT_ONLY_ALIASES = {
 @mcp.tool(annotations=_DESTRUCTIVE_TOOL_ANNOTATIONS)
 async def search(
     query: str,
-    search_type: SearchType = "semantic",
-    target_uri: str = "",
+    search_type: Annotated[
+        SearchType,
+        Field(
+            description="'keywords' needs a full-text backend (volcengine, vikingdb or "
+            "opengauss) with full-text indexing enabled; otherwise use 'semantic' or the "
+            "grep tool."
+        ),
+    ] = "semantic",
+    target_uri: Annotated[
+        str, Field(description="mode='list' only: scope search to this URI.")
+    ] = "",
     session_id: Optional[str] = None,
     limit: int = 10,
     min_score: Optional[float] = None,
     level: Optional[List[int]] = None,
     context_type: Optional[Union[str, List[str]]] = None,
-    mode: Literal["list", "context"] = "list",
-    query_expansion: Literal["off", "auto"] = "auto",
-    max_tokens: Annotated[int, Field(ge=64, le=32000)] = DEFAULT_MAX_TOKENS,
-    quotas: Optional[Dict[str, int]] = None,
-    purpose: Optional[Literal["chat", "coding"]] = None,
-    detail: Literal["auto", "abstract", "overview", "full"] = "auto",
-    detail_by_category: Optional[Dict[str, str]] = None,
-    dedup_turns: Annotated[int, Field(ge=0, le=100)] = 0,
-    exclude_uris: Annotated[Optional[List[str]], Field(max_length=MAX_EXCLUDE_URIS)] = None,
-    peer_scope: Literal["actor", "all"] = "all",
-    other_peer_penalty: Optional[float] = None,
-    other_peer_penalties: Optional[Dict[str, float]] = None,
-    rewrite: Literal["off", "auto"] = "off",
-    rewrite_max_bullets: Annotated[int, Field(ge=1, le=20)] = 6,
-    read_content: bool = False,
+    mode: Annotated[
+        Literal["list", "context"],
+        Field(description="Choose 'list' for ranked hits or 'context' for token-budgeted context."),
+    ] = "list",
+    query_expansion: Annotated[
+        Literal["off", "auto"], Field(description="mode='context' only: control query expansion.")
+    ] = "auto",
+    max_tokens: Annotated[
+        int, Field(ge=64, le=32000, description="mode='context' only: token budget for the result.")
+    ] = DEFAULT_MAX_TOKENS,
+    quotas: Annotated[
+        Optional[Dict[str, int]], Field(description="mode='context' only: hit limits by category.")
+    ] = None,
+    purpose: Annotated[
+        Optional[Literal["chat", "coding"]],
+        Field(description="mode='context' only: context preset."),
+    ] = None,
+    detail: Annotated[
+        Literal["auto", "abstract", "overview", "full"],
+        Field(description="mode='context' only: detail level for all categories."),
+    ] = "auto",
+    detail_by_category: Annotated[
+        Optional[Dict[str, str]],
+        Field(description="mode='context' only: detail levels by category instead of one level."),
+    ] = None,
+    dedup_turns: Annotated[
+        int,
+        Field(
+            ge=0, le=100, description="mode='context' only: turns to suppress repeated hits for."
+        ),
+    ] = 0,
+    exclude_uris: Annotated[
+        Optional[List[str]],
+        Field(max_length=MAX_EXCLUDE_URIS, description="mode='context' only: URIs to leave out."),
+    ] = None,
+    peer_scope: Annotated[
+        Literal["actor", "all"],
+        Field(description="mode='context' only: search the actor peer or all visible peers."),
+    ] = "all",
+    other_peer_penalty: Annotated[
+        Optional[float], Field(description="mode='context' only: score penalty for other peers.")
+    ] = None,
+    other_peer_penalties: Annotated[
+        Optional[Dict[str, float]],
+        Field(description="mode='context' only: other-peer score penalties by category."),
+    ] = None,
+    rewrite: Annotated[
+        Literal["off", "auto"], Field(description="mode='context' only: control digest rewriting.")
+    ] = "off",
+    rewrite_max_bullets: Annotated[
+        int, Field(ge=1, le=20, description="mode='context' only: maximum bullets in the digest.")
+    ] = 6,
+    read_content: Annotated[
+        bool, Field(description="mode='list' only: inline the full stored content of each hit.")
+    ] = False,
     events_time_decay_protection: Optional[str] = None,
 ) -> str:
     """Retrieval with optional session context and intent analysis.
@@ -882,6 +931,9 @@ async def _describe_skills_by_package(items: List[Dict[str, Any]], *, service, c
     await asyncio.gather(*(_describe(root) for root in pending))
 
 
+_LIST_HIT_PREVIEW_MAX_CHARS = 600
+
+
 async def _format_search_result(result, *, service, ctx, read_content: bool = False) -> str:
     items: List[Dict[str, Any]] = []
     seen: dict[str, int] = {}
@@ -933,6 +985,11 @@ async def _format_search_result(result, *, service, ctx, read_content: bool = Fa
     lines = []
     for item in items:
         abstract = (item["abstract"] or "(no abstract)").strip()
+        if len(abstract) > _LIST_HIT_PREVIEW_MAX_CHARS:
+            abstract = (
+                abstract[:_LIST_HIT_PREVIEW_MAX_CHARS]
+                + "... (Use `read` with this hit's URI for the full text.)"
+            )
         uri = item["uri"]
         line = f"- [{item['type']} {item['score'] * 100:.0f}%] {uri}\n    {abstract}"
         origin_score = item["origin_score"]

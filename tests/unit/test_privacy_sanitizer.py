@@ -187,6 +187,23 @@ async def test_sanitizer_cache_rebuilds_only_after_catalog_revision_changes():
     assert catalog.build_reads == 2
 
 
+async def test_matcher_cache_reuses_alternating_session_scopes():
+    catalog = _PrivacyCatalog(
+        {"session": {"a": {"key": "invented-value-a"}, "b": {"key": "invented-value-b"}}}
+    )
+    sanitizer = PrivacySanitizer(catalog)
+    ctx = _ctx()
+
+    for target_key, expected_builds in [("a", 1), ("b", 2), ("a", 2)]:
+        find = await sanitizer.prepare_matcher(
+            ctx, prefer_credentials=True, session_target_key=target_key
+        )
+        assert catalog.build_reads == expected_builds
+        assert [hit.reference for hit in find("invented-value-a invented-value-b")] == [
+            build_privacy_field_reference("alice", "session", target_key, "key")
+        ]
+
+
 async def test_sanitizer_cache_expires_after_ttl_even_without_local_revision_change():
     catalog = _PrivacyCatalog({"credential": {"service": {"key": "first1"}}})
     now = [100.0]
@@ -287,7 +304,7 @@ async def test_credential_preference_selects_only_an_unambiguous_field(
 ):
     configs = {
         category: {f"target-{i}": {"key": "shared-secret"} for i in range(count)}
-        for category, count in [("credential", credentials), ("session", ordinary)]
+        for category, count in [("credential", credentials), ("custom", ordinary)]
     }
     sanitizer = PrivacySanitizer(_PrivacyCatalog(configs))
     find = await sanitizer.prepare_matcher(_ctx(), prefer_credentials=True)
@@ -300,16 +317,32 @@ async def test_credential_preference_selects_only_an_unambiguous_field(
         ]
 
 
+async def test_session_matcher_prefers_credential_reference_for_shared_value():
+    catalog = _PrivacyCatalog(
+        {
+            "credential": {"managed": {"key": "invented-shared-value"}},
+            "session": {"a": {"key": "invented-shared-value"}},
+        }
+    )
+    find = await PrivacySanitizer(catalog).prepare_matcher(
+        _ctx(), prefer_credentials=True, session_target_key="a"
+    )
+
+    assert [hit.reference for hit in find("invented-shared-value")] == [
+        build_privacy_field_reference("alice", "credential", "managed", "key")
+    ]
+
+
 async def test_matcher_cache_separates_policies_and_refreshes_both_after_rotation():
     catalog = _PrivacyCatalog(
         {
             "credential": {"managed": {"key": "shared-secret"}},
-            "session": {"captured": {"key": "shared-secret"}},
+            "custom": {"service": {"key": "shared-secret"}},
         }
     )
     sanitizer = PrivacySanitizer(catalog)
     credential = build_privacy_field_reference("alice", "credential", "managed", "key")
-    captured = build_privacy_field_reference("alice", "session", "captured", "key")
+    custom = build_privacy_field_reference("alice", "custom", "service", "key")
     for preferred in [False, True] * 2:
         result = await sanitizer.sanitize("shared-secret", ctx=_ctx(), prefer_credentials=preferred)
         assert result.content == (credential if preferred else "{{ov_privacy:ambiguous}}")
@@ -319,4 +352,4 @@ async def test_matcher_cache_separates_policies_and_refreshes_both_after_rotatio
         result = await sanitizer.sanitize(
             "shared-secret rotated-secret", ctx=_ctx(), prefer_credentials=preferred
         )
-        assert result.content == f"{captured} {credential}"
+        assert result.content == f"{custom} {credential}"
